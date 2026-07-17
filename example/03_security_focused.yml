@@ -17,7 +17,7 @@ spec:
     - "ipgeolocation_ip_security"
   destinations: ["sqlite"]
   spec:
-    api_key: ""
+    api_key: "${IPGEOLOCATION_API_KEY}"
 
     ips:
       # Clean IPs

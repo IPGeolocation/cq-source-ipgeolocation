@@ -16,7 +16,7 @@ spec:
     - "ipgeolocation_user_agent"
   destinations: ["sqlite"]
   spec:
-    api_key: ""
+    api_key: "${IPGEOLOCATION_API_KEY}"
 
     # No IPs needed for this table.
     ips: []

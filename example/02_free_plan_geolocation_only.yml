@@ -16,7 +16,7 @@ spec:
     - "ipgeolocation_ip_geolocation"
   destinations: ["sqlite"]
   spec:
-    api_key: ""
+    api_key: "${IPGEOLOCATION_API_KEY}"
 
     ips:
       - "8.8.8.8"
