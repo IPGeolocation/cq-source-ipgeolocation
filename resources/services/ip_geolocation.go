@@ -8,8 +8,8 @@ import (
 	"github.com/cloudquery/plugin-sdk/v4/schema"
 	"github.com/cloudquery/plugin-sdk/v4/transformers"
 
-	"github.com/anthropic/cq-source-ipgeolocation/client"
-	"github.com/anthropic/cq-source-ipgeolocation/internal/ipgeolocation"
+	"github.com/IPGeolocation/cq-source-ipgeolocation/client"
+	"github.com/IPGeolocation/cq-source-ipgeolocation/internal/ipgeolocation"
 )
 
 // IPGeolocationFlat is a flattened representation of the IP Geolocation API response.
@@ -68,13 +68,13 @@ type IPGeolocationFlat struct {
 	CompanyDomain string `json:"company_domain"`
 
 	// Timezone
-	TimezoneName             string  `json:"timezone_name"`
-	TimezoneOffset           float64 `json:"timezone_offset"`
-	TimezoneOffsetWithDST    float64 `json:"timezone_offset_with_dst"`
-	TimezoneCurrentTime      string  `json:"timezone_current_time"`
-	TimezoneCurrentTimeUnix  float64 `json:"timezone_current_time_unix"`
-	TimezoneAbbreviation     string  `json:"timezone_abbreviation"`
-	TimezoneIsDST            bool    `json:"timezone_is_dst"`
+	TimezoneName            string  `json:"timezone_name"`
+	TimezoneOffset          float64 `json:"timezone_offset"`
+	TimezoneOffsetWithDST   float64 `json:"timezone_offset_with_dst"`
+	TimezoneCurrentTime     string  `json:"timezone_current_time"`
+	TimezoneCurrentTimeUnix float64 `json:"timezone_current_time_unix"`
+	TimezoneAbbreviation    string  `json:"timezone_abbreviation"`
+	TimezoneIsDST           bool    `json:"timezone_is_dst"`
 
 	// Security (optional, paid plans)
 	ThreatScore        int    `json:"threat_score"`

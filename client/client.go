@@ -1,7 +1,7 @@
 package client
 
 import (
-	"github.com/anthropic/cq-source-ipgeolocation/internal/ipgeolocation"
+	"github.com/IPGeolocation/cq-source-ipgeolocation/internal/ipgeolocation"
 	"github.com/cloudquery/plugin-sdk/v4/state"
 	"github.com/rs/zerolog"
 )

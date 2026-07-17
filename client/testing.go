@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/anthropic/cq-source-ipgeolocation/internal/ipgeolocation"
+	"github.com/IPGeolocation/cq-source-ipgeolocation/internal/ipgeolocation"
 	"github.com/rs/zerolog"
 )
 

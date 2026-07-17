@@ -13,9 +13,9 @@ import (
 	"github.com/cloudquery/plugin-sdk/v4/transformers"
 	"github.com/rs/zerolog"
 
-	"github.com/anthropic/cq-source-ipgeolocation/client"
-	"github.com/anthropic/cq-source-ipgeolocation/internal/ipgeolocation"
-	"github.com/anthropic/cq-source-ipgeolocation/resources/services"
+	"github.com/IPGeolocation/cq-source-ipgeolocation/client"
+	"github.com/IPGeolocation/cq-source-ipgeolocation/internal/ipgeolocation"
+	"github.com/IPGeolocation/cq-source-ipgeolocation/resources/services"
 )
 
 // Client implements plugin.Client for the ipgeolocation source plugin.

@@ -6,7 +6,7 @@ import (
 
 	"github.com/cloudquery/plugin-sdk/v4/serve"
 
-	plugin "github.com/anthropic/cq-source-ipgeolocation/resources/plugin"
+	plugin "github.com/IPGeolocation/cq-source-ipgeolocation/resources/plugin"
 )
 
 func main() {

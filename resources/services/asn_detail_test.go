@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/anthropic/cq-source-ipgeolocation/client"
+	"github.com/IPGeolocation/cq-source-ipgeolocation/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -6,8 +6,8 @@ import (
 	"github.com/cloudquery/plugin-sdk/v4/schema"
 	"github.com/cloudquery/plugin-sdk/v4/transformers"
 
-	"github.com/anthropic/cq-source-ipgeolocation/client"
-	"github.com/anthropic/cq-source-ipgeolocation/internal/ipgeolocation"
+	"github.com/IPGeolocation/cq-source-ipgeolocation/client"
+	"github.com/IPGeolocation/cq-source-ipgeolocation/internal/ipgeolocation"
 )
 
 // UserAgentFlat is a flattened user-agent parse response for CloudQuery columns.

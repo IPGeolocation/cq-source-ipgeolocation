@@ -1,7 +1,7 @@
 package plugin
 
 import (
-	internalPlugin "github.com/anthropic/cq-source-ipgeolocation/plugin"
+	internalPlugin "github.com/IPGeolocation/cq-source-ipgeolocation/plugin"
 	"github.com/cloudquery/plugin-sdk/v4/plugin"
 )
 

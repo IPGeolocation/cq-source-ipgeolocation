@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/anthropic/cq-source-ipgeolocation/client"
+	"github.com/IPGeolocation/cq-source-ipgeolocation/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,23 +16,23 @@ func TestFetchIPGeolocation(t *testing.T) {
 	mockResponse := map[string]interface{}{
 		"ip": "8.8.8.8",
 		"location": map[string]interface{}{
-			"continent_code":       "NA",
-			"continent_name":       "North America",
-			"country_code2":        "US",
-			"country_code3":        "USA",
-			"country_name":         "United States",
+			"continent_code":        "NA",
+			"continent_name":        "North America",
+			"country_code2":         "US",
+			"country_code3":         "USA",
+			"country_name":          "United States",
 			"country_name_official": "United States of America",
-			"country_capital":      "Washington, D.C.",
-			"state_prov":           "California",
-			"state_code":           "US-CA",
-			"district":             "Santa Clara County",
-			"city":                 "Mountain View",
-			"zipcode":              "94043",
-			"latitude":             "37.42240",
-			"longitude":            "-122.08421",
-			"is_eu":                false,
-			"country_flag":         "https://ipgeolocation.io/static/flags/us_64.png",
-			"geoname_id":           "5375480",
+			"country_capital":       "Washington, D.C.",
+			"state_prov":            "California",
+			"state_code":            "US-CA",
+			"district":              "Santa Clara County",
+			"city":                  "Mountain View",
+			"zipcode":               "94043",
+			"latitude":              "37.42240",
+			"longitude":             "-122.08421",
+			"is_eu":                 false,
+			"country_flag":          "https://ipgeolocation.io/static/flags/us_64.png",
+			"geoname_id":            "5375480",
 		},
 		"currency": map[string]interface{}{
 			"code":   "USD",
@@ -45,15 +45,15 @@ func TestFetchIPGeolocation(t *testing.T) {
 			"country":      "US",
 		},
 		"time_zone": map[string]interface{}{
-			"name":                   "America/Los_Angeles",
-			"offset":                 -8.0,
-			"offset_with_dst":        -7.0,
-			"current_time":           "2026-01-01 12:00:00.000-0800",
-			"current_time_unix":      1735756800.0,
+			"name":                    "America/Los_Angeles",
+			"offset":                  -8.0,
+			"offset_with_dst":         -7.0,
+			"current_time":            "2026-01-01 12:00:00.000-0800",
+			"current_time_unix":       1735756800.0,
 			"current_tz_abbreviation": "PST",
 			"is_dst":                  false,
-			"dst_savings":            0.0,
-			"dst_exists":             true,
+			"dst_savings":             0.0,
+			"dst_exists":              true,
 		},
 	}
 

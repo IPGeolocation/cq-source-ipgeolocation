@@ -1,4 +1,4 @@
-module github.com/anthropic/cq-source-ipgeolocation
+module github.com/IPGeolocation/cq-source-ipgeolocation
 
 go 1.22.7
 
