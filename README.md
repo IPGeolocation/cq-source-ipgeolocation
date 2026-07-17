@@ -72,4 +72,4 @@ go test ./... -v        # Run tests (34 tests, no API key needed)
 
 ## License
 
-Apache License 2.0
+MIT
