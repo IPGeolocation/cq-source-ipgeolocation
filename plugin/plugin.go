@@ -1,8 +1,8 @@
 package plugin
 
 var (
-	Name    = "ipgeolocation"
+	Name    = "IPGeolocation.io"
 	Kind    = "source"
-	Team    = "anthropic"
+	Team    = "ipgeolocation-io"
 	Version = "v1.0.0"
 )
