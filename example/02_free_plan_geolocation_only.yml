@@ -1,0 +1,36 @@
+# ============================================================
+# CONFIG 2: FREE PLAN - Geolocation only
+# ============================================================
+# Tests: Only the ipgeolocation_ip_geolocation table.
+#        No security, no abuse, no ASN detail, no user-agent.
+#        Works with the free 1,000 credits/day plan.
+# Credits: 3 credits (1 per IP)
+# Plan: FREE
+# ============================================================
+kind: source
+spec:
+  name: ipgeolocation
+  registry: grpc
+  path: "localhost:7777"
+  tables:
+    - "ipgeolocation_ip_geolocation"
+  destinations: ["sqlite"]
+  spec:
+    api_key: ""
+
+    ips:
+      - "8.8.8.8"
+      - "1.1.1.1"
+      - "91.128.103.196"
+
+    # Security and abuse are OFF (free plan would return 401).
+    include_security: false
+    include_abuse: false
+---
+kind: destination
+spec:
+  name: sqlite
+  path: cloudquery/sqlite
+  version: "v2.9.3"
+  spec:
+    connection_string: "./ipgeo_free_plan.db"

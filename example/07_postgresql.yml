@@ -1,0 +1,36 @@
+# ============================================================
+# CONFIG 7: POSTGRESQL DESTINATION
+# ============================================================
+# Same as config 1 but syncing to PostgreSQL instead of SQLite.
+# Tests: Production-style deployment with a real database.
+# ============================================================
+kind: source
+spec:
+  name: ipgeolocation
+  registry: grpc
+  path: "localhost:7777"
+  tables: ["*"]
+  destinations: ["postgresql"]
+  spec:
+    api_key: "${IPGEOLOCATION_API_KEY}"
+    ips:
+      - "8.8.8.8"
+      - "1.1.1.1"
+      - "2.56.188.34"
+    asns:
+      - "15169"
+      - "13335"
+    user_agents:
+      - "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0"
+      - "Googlebot/2.1"
+    include_security: true
+    include_abuse: true
+---
+kind: destination
+spec:
+  name: postgresql
+  path: cloudquery/postgresql
+  version: "v8.7.2"
+  spec:
+    connection_string: "${POSTGRESQL_CONNECTION_STRING}"
+    # Example: "postgresql://user:pass@localhost:5432/ipgeolocation?sslmode=disable"

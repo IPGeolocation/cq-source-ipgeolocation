@@ -1,0 +1,67 @@
+# ============================================================
+# CONFIG 5: USER-AGENT PARSING - Browser & bot detection
+# ============================================================
+# Tests: ipgeolocation_user_agent table only.
+# Use case: Parse user-agent strings from web server logs to
+#           identify browsers, bots, mobile devices, and crawlers.
+# Credits: 1 per user-agent string
+# Plan: Paid (standalone /v3/user-agent endpoint)
+# ============================================================
+kind: source
+spec:
+  name: ipgeolocation
+  registry: grpc
+  path: "localhost:7777"
+  tables:
+    - "ipgeolocation_user_agent"
+  destinations: ["sqlite"]
+  spec:
+    api_key: ""
+
+    # No IPs needed for this table.
+    ips: []
+
+    user_agents:
+      # Desktop browsers
+      - "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      - "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15"
+      - "Mozilla/5.0 (X11; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0"
+
+      # Mobile browsers
+      - "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1"
+      - "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.144 Mobile Safari/537.36"
+
+      # Bots and crawlers
+      - "Googlebot/2.1 (+http://www.google.com/bot.html)"
+      - "Mozilla/5.0 (compatible; Bingbot/2.0; +http://www.bing.com/bingbot.htm)"
+      - "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)"
+
+      # Programming libraries
+      - "python-requests/2.31.0"
+      - "curl/8.4.0"
+      - "Go-http-client/2.0"
+      - "axios/1.6.2"
+
+      # Edge cases
+      - ""                   # Empty string
+      - "UnknownBot/1.0"    # Unknown bot
+---
+kind: destination
+spec:
+  name: sqlite
+  path: cloudquery/sqlite
+  version: "v2.9.3"
+  spec:
+    connection_string: "./ipgeo_useragent.db"
+
+# EXAMPLE QUERIES after sync:
+# ─────────────────────────────────────────────────────────
+# -- Separate bots from real browsers
+# SELECT name, type, device_type, os_name
+# FROM ipgeolocation_user_agent
+# ORDER BY type;
+#
+# -- Find all mobile user agents
+# SELECT user_agent_string, device_name, device_brand, os_name
+# FROM ipgeolocation_user_agent
+# WHERE device_type = 'Mobile';

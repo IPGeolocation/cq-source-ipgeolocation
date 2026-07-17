@@ -1,0 +1,69 @@
+# ============================================================
+# CONFIG 3: SECURITY FOCUSED - Threat detection
+# ============================================================
+# Tests: ipgeolocation_ip_security + ipgeolocation_ip_geolocation
+#        with a mix of clean, proxy, VPN, Tor, and bot IPs.
+# Use case: Enrich firewall/CDN logs with threat intelligence.
+# Credits: ~30 (2 credits/IP for security + 3 credits/IP for geo+security)
+# Plan: PAID
+# ============================================================
+kind: source
+spec:
+  name: ipgeolocation
+  registry: grpc
+  path: "localhost:7777"
+  tables:
+    - "ipgeolocation_ip_geolocation"
+    - "ipgeolocation_ip_security"
+  destinations: ["sqlite"]
+  spec:
+    api_key: ""
+
+    ips:
+      # Clean IPs
+      - "8.8.8.8"            # Google DNS - should be clean
+      - "1.1.1.1"            # Cloudflare - should be clean
+
+      # Known VPN/proxy IPs (high threat score expected)
+      - "2.56.188.34"        # Known proxy + VPN
+      - "185.220.101.1"      # Tor exit node (common)
+
+      # Cloud provider IPs
+      - "13.107.42.14"       # Microsoft Azure
+      - "35.186.224.47"      # Google Cloud
+
+      # Residential / ISP
+      - "91.128.103.196"     # Tele2 Sweden (residential ISP)
+
+    # Include security data inside the geolocation response too.
+    include_security: true
+    include_abuse: false
+
+    rate_limit: 5
+---
+kind: destination
+spec:
+  name: sqlite
+  path: cloudquery/sqlite
+  version: "v2.9.3"
+  spec:
+    connection_string: "./ipgeo_security.db"
+
+# EXAMPLE QUERIES after sync:
+# ─────────────────────────────────────────────────────────
+# -- Find all IPs with threat score > 50
+# SELECT ip, threat_score, is_vpn, is_proxy, is_tor, vpn_provider_names
+# FROM ipgeolocation_ip_security
+# WHERE threat_score > 50
+# ORDER BY threat_score DESC;
+#
+# -- Find all anonymous IPs (VPN + proxy + Tor + relay)
+# SELECT ip, is_vpn, is_proxy, is_tor, is_relay
+# FROM ipgeolocation_ip_security
+# WHERE is_anonymous = 1;
+#
+# -- Cross-reference: location of high-threat IPs
+# SELECT g.ip, g.country_name, g.city, s.threat_score, s.is_vpn
+# FROM ipgeolocation_ip_geolocation g
+# JOIN ipgeolocation_ip_security s ON g.ip = s.ip
+# WHERE s.threat_score > 30;

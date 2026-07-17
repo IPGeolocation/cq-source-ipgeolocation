@@ -1,0 +1,58 @@
+# ============================================================
+# CONFIG 1: ALL TABLES - Full feature test
+# ============================================================
+# Tests: All 5 tables, multiple IPs, ASNs by number, user-agents,
+#        security + abuse enrichment on the geolocation table.
+# Credits: ~35 per sync (varies with IP count)
+# Plan: Requires PAID plan for security, abuse, and ASN tables.
+# ============================================================
+kind: source
+spec:
+  name: ipgeolocation
+  registry: grpc
+  path: "localhost:7777"
+  tables: ["*"]
+  destinations: ["sqlite"]
+  spec:
+    api_key: "${IPGEOLOCATION_API_KEY}"
+
+    # Mix of well-known IPs: Google DNS, Cloudflare, a known proxy IP, and an education network.
+    ips:
+      - "8.8.8.8"          # Google DNS (US, ISP)
+      - "1.1.1.1"          # Cloudflare DNS (anycast)
+      - "2.56.188.34"      # Known proxy/VPN IP (high threat score)
+      - "91.128.103.196"   # Tele2 Sweden (EU, ISP)
+      - "128.122.0.1"      # NYU (US, Education)
+      - "159.26.99.225"
+
+    # Direct ASN lookups by number (only used by ipgeolocation_asn table).
+    asns:
+      - "15169"            # Google
+      - "13335"            # Cloudflare
+      - "24940"            # Hetzner
+
+    # User-agent strings to parse.
+    user_agents:
+      - "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      - "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1"
+      - "python-requests/2.31.0"
+      - "curl/8.4.0"
+      - "Googlebot/2.1 (+http://www.google.com/bot.html)"
+
+    # Enrich the main geolocation table with security + abuse (paid plans).
+    include_security: true
+    include_abuse: true
+
+    # Tuning
+    concurrency: 5
+    rate_limit: 10
+    timeout: "30s"
+    retry_attempts: 3
+---
+kind: destination
+spec:
+  name: sqlite
+  path: cloudquery/sqlite
+  version: "v2.9.3"
+  spec:
+    connection_string: "./ipgeo_all_tables.db"

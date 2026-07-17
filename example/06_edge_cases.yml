@@ -1,0 +1,58 @@
+# ============================================================
+# CONFIG 6: EDGE CASES
+# ============================================================
+# Tests edge cases:
+#   - Caller IP auto-detection (no ips specified)
+#   - IPv6 addresses
+#   - Domain name lookup (paid only)
+#   - Single IP only
+#   - Minimal config (all defaults)
+# ============================================================
+kind: source
+spec:
+  name: ipgeolocation
+  registry: grpc
+  path: "localhost:7777"
+  tables:
+    - "ipgeolocation_ip_geolocation"
+  destinations: ["sqlite"]
+  spec:
+    api_key: ""
+
+    # EDGE CASE 1: No IPs → auto-detects the caller's own public IP.
+    # Uncomment this block and comment out the ips list below to test.
+    # ips: []
+
+    # EDGE CASE 2: Mix of IPv4, IPv6, and domain lookups.
+    ips:
+      - "8.8.8.8"                                      # Standard IPv4
+      - "2607:fb91:16c6:8860:e531:2d1d:4944:6c7c"      # IPv6
+      - "::1"                                           # Loopback IPv6 (should return error/bogon)
+      - "10.0.0.1"                                      # Private IP (should return 423 Locked/bogon)
+      - "999.999.999.999"                               # Invalid IP (should return 400)
+
+    # All other settings use defaults:
+    # endpoint: https://api.ipgeolocation.io
+    # timeout: 30s
+    # retry_attempts: 3
+    # concurrency: 10
+    # rate_limit: 15
+---
+kind: destination
+spec:
+  name: sqlite
+  path: cloudquery/sqlite
+  version: "v2.9.3"
+  spec:
+    connection_string: "./ipgeo_edge_cases.db"
+
+# EXPECTED BEHAVIOR:
+# ─────────────────────────────────────────────────────────
+# "8.8.8.8"           → Success (Google DNS, US)
+# IPv6 address        → Success (if valid public IPv6)
+# "::1"               → Skipped with warning (bogon/loopback → 423)
+# "10.0.0.1"          → Skipped with warning (private range → 423)
+# "999.999.999.999"   → Skipped with warning (invalid → 400)
+#
+# The plugin logs warnings for failed IPs and continues.
+# Only valid results appear in the database.

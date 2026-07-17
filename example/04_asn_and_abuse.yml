@@ -1,0 +1,62 @@
+# ============================================================
+# CONFIG 4: NETWORK INTELLIGENCE - ASN + Abuse contacts
+# ============================================================
+# Tests: ipgeolocation_asn (by IP + by ASN number)
+#        ipgeolocation_abuse_contact
+# Use case: Map network topology, find upstream/downstream providers,
+#           get abuse contacts for incident response.
+# Credits: ~10 (1/IP for ASN, 1/ASN, 1/IP for abuse)
+# Plan: PAID (ASN detail endpoint requires paid; abuse requires paid)
+# ============================================================
+kind: source
+spec:
+  name: ipgeolocation
+  registry: grpc
+  path: "localhost:7777"
+  tables:
+    - "ipgeolocation_asn"
+    - "ipgeolocation_abuse_contact"
+  destinations: ["sqlite"]
+  spec:
+    api_key: "${IPGEOLOCATION_API_KEY}"
+
+    # Look up ASN + abuse by IP address.
+    ips:
+      - "49.12.0.0"          # Hetzner (DE, hosting)
+      - "8.8.8.8"            # Google DNS
+      - "128.122.0.1"        # NYU (education)
+
+    # Also look up ASN details directly by AS number.
+    # This is only used by the ipgeolocation_asn table.
+    asns:
+      - "1"                  # Level 3 (huge transit provider, many peers)
+      - "12"                 # NYU (education, few downstreams)
+      - "24940"              # Hetzner (hosting, many routes)
+      - "13335"              # Cloudflare (CDN/anycast)
+
+    rate_limit: 5
+---
+kind: destination
+spec:
+  name: sqlite
+  path: cloudquery/sqlite
+  version: "v2.9.3"
+  spec:
+    connection_string: "./ipgeo_network.db"
+
+# EXAMPLE QUERIES after sync:
+# ─────────────────────────────────────────────────────────
+# -- Find ASNs with the most IPv4 routes
+# SELECT as_number, organization, num_of_ipv4_routes, country, type
+# FROM ipgeolocation_asn
+# ORDER BY CAST(num_of_ipv4_routes AS INTEGER) DESC;
+#
+# -- Show all upstream providers for each ASN
+# SELECT as_number, organization, upstreams
+# FROM ipgeolocation_asn
+# WHERE upstreams != '';
+#
+# -- Find abuse contacts with email addresses
+# SELECT ip, name, emails, phone_numbers
+# FROM ipgeolocation_abuse_contact
+# WHERE emails != '';

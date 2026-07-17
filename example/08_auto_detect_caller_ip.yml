@@ -1,0 +1,32 @@
+# ============================================================
+# CONFIG 8: AUTO-DETECT CALLER IP
+# ============================================================
+# Tests: What happens when no IPs are configured.
+#        The API automatically detects and returns data for
+#        the machine's own public IP address.
+# Credits: 1 per table
+# Plan: FREE (for geolocation only)
+# ============================================================
+kind: source
+spec:
+  name: ipgeolocation
+  registry: grpc
+  path: "localhost:7777"
+  tables:
+    - "ipgeolocation_ip_geolocation"
+  destinations: ["sqlite"]
+  spec:
+    api_key: "${IPGEOLOCATION_API_KEY}"
+    # Deliberately omitting ips, asns, user_agents.
+    # The geolocation table will auto-detect the caller's public IP.
+---
+kind: destination
+spec:
+  name: sqlite
+  path: cloudquery/sqlite
+  version: "v2.9.3"
+  spec:
+    connection_string: "./ipgeo_auto_detect.db"
+
+# After sync, check what IP was detected:
+# sqlite3 ipgeo_auto_detect.db "SELECT ip, country_name, city FROM ipgeolocation_ip_geolocation;"
