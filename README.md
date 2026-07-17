@@ -10,7 +10,7 @@ A [CloudQuery](https://cloudquery.io) source plugin that fetches IP intelligence
 | `ipgeolocation_ip_security` | `/v3/security` | Threat score, VPN/proxy/Tor/relay/bot/spam detection, provider names | 2/IP | Paid |
 | `ipgeolocation_abuse_contact` | `/v3/abuse` | Abuse team name, emails, phones, postal address per network block | 1/IP | Paid |
 | `ipgeolocation_asn` | `/v3/asn` | ASN name, org, routes, peers, upstreams, downstreams, allocation status | 1/IP or ASN | Paid |
-| `ipgeolocation_user_agent` | `/v3/user-agent` | Browser, device, engine, OS detection from user-agent strings | 1/UA | Free |
+| `ipgeolocation_user_agent` | `/v3/user-agent` | Browser, device, engine, OS detection from user-agent strings | 1/UA | Paid |
 
 ## Quick Start
 
