@@ -24,7 +24,7 @@ The plugin is configured through the `spec` block of a `source` entry in your Cl
 kind: source
 spec:
   name: "ipgeolocation"
-  path: "ipgeolocation-io/ipgeolocation"
+  path: "ipgeolocation-io/ipgeolocation-io"
   version: "v1.0.0"
   tables: ["ipgeolocation_ip_geolocation"]
   destinations: ["sqlite"]
@@ -39,7 +39,7 @@ spec:
 kind: source
 spec:
   name: "ipgeolocation"
-  path: "ipgeolocation-io/ipgeolocation"
+  path: "ipgeolocation-io/ipgeolocation-io"
   version: "v1.0.0"
   tables: ["*"]
   destinations: ["sqlite"]
