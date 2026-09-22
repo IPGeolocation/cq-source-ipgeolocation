@@ -108,7 +108,6 @@ The `example/` directory has eight configs you can run as is.
 
 ## Documentation
 
-- [Integration guide](docs/integration-guide.md): install, configure, sync, query
 - [Overview](docs/overview.md): what the plugin does and when to use it
 - [Configuration](docs/configuration.md): every spec field, with examples
 - [Tables](docs/tables.md): every column and type
