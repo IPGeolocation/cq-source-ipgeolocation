@@ -53,9 +53,11 @@ type CountryMetadata struct {
 
 // Network holds network/route information.
 type Network struct {
-	ConnectionType string `json:"connection_type"`
-	Route          string `json:"route"`
-	IsAnycast      bool   `json:"is_anycast"`
+	ConnectionType  string `json:"connection_type"`
+	Route           string `json:"route"`
+	IsAnycast       bool   `json:"is_anycast"`
+	IsCDN           bool   `json:"is_cdn"`
+	CDNProviderName string `json:"cdn_provider_name"`
 }
 
 // Currency holds the currency associated with the IP's country.
@@ -84,29 +86,54 @@ type Company struct {
 }
 
 // Security holds IP security / threat intelligence data.
+//
+// It mirrors the `security` object returned by /v3/security and by /v3/ipgeo
+// (when include=security is passed). Field list reference:
+// https://ipgeolocation.io/documentation/ip-security-api.html
 type Security struct {
-	ThreatScore          int      `json:"threat_score"`
-	IsTor                bool     `json:"is_tor"`
+	ThreatScore int `json:"threat_score"`
+
+	IsTor bool `json:"is_tor"`
+
 	IsProxy              bool     `json:"is_proxy"`
 	ProxyProviderNames   []string `json:"proxy_provider_names"`
 	ProxyConfidenceScore int      `json:"proxy_confidence_score"`
 	ProxyLastSeen        string   `json:"proxy_last_seen"`
 	IsResidentialProxy   bool     `json:"is_residential_proxy"`
-	IsVPN                bool     `json:"is_vpn"`
-	VPNProviderNames     []string `json:"vpn_provider_names"`
-	VPNConfidenceScore   int      `json:"vpn_confidence_score"`
-	VPNLastSeen          string   `json:"vpn_last_seen"`
-	IsRelay              bool     `json:"is_relay"`
-	RelayProviderName    string   `json:"relay_provider_name"`
-	IsAnonymous          bool     `json:"is_anonymous"`
-	IsKnownAttacker      bool     `json:"is_known_attacker"`
-	IsBot                bool     `json:"is_bot"`
-	IsSpam               bool     `json:"is_spam"`
-	IsCloudProvider      bool     `json:"is_cloud_provider"`
-	CloudProviderName    string   `json:"cloud_provider_name"`
+
+	IsVPN              bool     `json:"is_vpn"`
+	VPNProviderNames   []string `json:"vpn_provider_names"`
+	VPNConfidenceScore int      `json:"vpn_confidence_score"`
+	VPNLastSeen        string   `json:"vpn_last_seen"`
+
+	IsRelay           bool   `json:"is_relay"`
+	RelayProviderName string `json:"relay_provider_name"`
+
+	IsAnonymous     bool `json:"is_anonymous"`
+	IsKnownAttacker bool `json:"is_known_attacker"`
+
+	IsBot              bool   `json:"is_bot"`
+	BotConfidenceScore int    `json:"bot_confidence_score"`
+	BotOperatorName    string `json:"bot_operator_name"`
+	BotType            string `json:"bot_type"`
+	IsKnownGoodBot     bool   `json:"is_known_good_bot"`
+	BotLastSeen        string `json:"bot_last_seen"`
+
+	IsSpam bool `json:"is_spam"`
+
+	IsCloudProvider   bool   `json:"is_cloud_provider"`
+	CloudProviderName string `json:"cloud_provider_name"`
+
+	IsCorporateGateway           bool   `json:"is_corporate_gateway"`
+	CorporateGatewayType         string `json:"corporate_gateway_type"`
+	CorporateGatewayProviderName string `json:"corporate_gateway_provider_name"`
 }
 
 // AbuseContact holds abuse contact details for an IP's network.
+//
+// It mirrors the `abuse` object returned by /v3/abuse and by /v3/ipgeo (when
+// include=abuse is passed). Field list reference:
+// https://ipgeolocation.io/documentation/ip-abuse-contact-api.html
 type AbuseContact struct {
 	Route        string   `json:"route"`
 	Country      string   `json:"country"`
@@ -250,10 +277,34 @@ type ASNDetail struct {
 	NumIPv6Routes    string `json:"num_of_ipv6_routes"`
 	RIR              string `json:"rir"`
 
-	Routes      []string      `json:"routes,omitempty"`
-	Peers       []ASNRelation `json:"peers,omitempty"`
-	Upstreams   []ASNRelation `json:"upstreams,omitempty"`
-	Downstreams []ASNRelation `json:"downstreams,omitempty"`
+	// Optional modules: only present when requested through the `include`
+	// query parameter (see ASNIncludeOptions).
+	Routes        []string      `json:"routes,omitempty"`
+	Peers         []ASNRelation `json:"peers,omitempty"`
+	Upstreams     []ASNRelation `json:"upstreams,omitempty"`
+	Downstreams   []ASNRelation `json:"downstreams,omitempty"`
+	WhoisResponse string        `json:"whois_response,omitempty"`
+}
+
+// ASNInclude* are the optional modules the /v3/asn endpoint can add to its
+// default response through the `include` query parameter. Without any of them
+// the API returns only the base ASN fields.
+const (
+	ASNIncludePeers         = "peers"
+	ASNIncludeUpstreams     = "upstreams"
+	ASNIncludeDownstreams   = "downstreams"
+	ASNIncludeRoutes        = "routes"
+	ASNIncludeWhoisResponse = "whois_response"
+)
+
+// ASNIncludeOptions lists every value accepted by the /v3/asn `include`
+// parameter, in a stable canonical order.
+var ASNIncludeOptions = []string{
+	ASNIncludePeers,
+	ASNIncludeUpstreams,
+	ASNIncludeDownstreams,
+	ASNIncludeRoutes,
+	ASNIncludeWhoisResponse,
 }
 
 // ASNResponse is the top-level response from /v3/asn.

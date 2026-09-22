@@ -16,9 +16,13 @@ import (
 // CloudQuery tables work best with flat structs rather than deeply nested JSON.
 type IPGeolocationFlat struct {
 	// Core
-	IP       string `json:"ip"`
-	Domain   string `json:"domain"`
-	Hostname string `json:"hostname"`
+	IP     string `json:"ip"`
+	Domain string `json:"domain"`
+
+	// Hostname is only requested when include_hostname is true (resolution mode
+	// set by hostname_lookup); NULL otherwise. If the hostname cannot be
+	// resolved the API returns the queried IP itself.
+	Hostname *string `json:"hostname"`
 
 	// Location
 	ContinentCode       string `json:"continent_code"`
@@ -38,15 +42,29 @@ type IPGeolocationFlat struct {
 	IsEU                bool   `json:"is_eu"`
 	GeonameID           string `json:"geoname_id"`
 
+	// Geo accuracy (optional; only requested when include_geo_accuracy is
+	// true, NULL otherwise): locality/neighbourhood, accuracy radius in km
+	// around latitude/longitude, and confidence (low, medium, high).
+	Locality       *string `json:"locality"`
+	AccuracyRadius *string `json:"accuracy_radius"`
+	Confidence     *string `json:"confidence"`
+
+	// DMACode is the Designated Market Area code (optional; only requested when
+	// include_dma_code is true, NULL otherwise). The API only fills it for US
+	// locations, so it is an empty string elsewhere.
+	DMACode *string `json:"dma_code"`
+
 	// Country metadata
 	CallingCode string `json:"calling_code"`
 	TLD         string `json:"tld"`
 	Languages   string `json:"languages"` // comma-separated
 
 	// Network
-	ConnectionType string `json:"connection_type"`
-	Route          string `json:"route"`
-	IsAnycast      bool   `json:"is_anycast"`
+	ConnectionType  string `json:"connection_type"`
+	Route           string `json:"route"`
+	IsAnycast       bool   `json:"is_anycast"`
+	IsCDN           bool   `json:"is_cdn"`
+	CDNProviderName string `json:"cdn_provider_name"`
 
 	// Currency
 	CurrencyCode   string `json:"currency_code"`
@@ -76,34 +94,32 @@ type IPGeolocationFlat struct {
 	TimezoneAbbreviation    string  `json:"timezone_abbreviation"`
 	TimezoneIsDST           bool    `json:"timezone_is_dst"`
 
-	// Security (optional, paid plans)
-	ThreatScore        int    `json:"threat_score"`
-	IsTor              bool   `json:"is_tor"`
-	IsProxy            bool   `json:"is_proxy"`
-	IsResidentialProxy bool   `json:"is_residential_proxy"`
-	IsVPN              bool   `json:"is_vpn"`
-	IsRelay            bool   `json:"is_relay"`
-	IsAnonymous        bool   `json:"is_anonymous"`
-	IsKnownAttacker    bool   `json:"is_known_attacker"`
-	IsBot              bool   `json:"is_bot"`
-	IsSpam             bool   `json:"is_spam"`
-	IsCloudProvider    bool   `json:"is_cloud_provider"`
-	CloudProviderName  string `json:"cloud_provider_name"`
+	// Security data (optional; only requested when include_security is true).
+	// Exposes every field of the API's `security` object as unprefixed columns
+	// (threat_score, is_vpn, bot_type, is_corporate_gateway, ...). The pointer is
+	// nil when the data was not requested, which makes all of these columns NULL
+	// instead of a misleading false/0.
+	*SecurityFields
 
-	// Abuse (optional, paid plans)
-	AbuseRoute   string `json:"abuse_route"`
-	AbuseName    string `json:"abuse_name"`
-	AbuseEmails  string `json:"abuse_emails"` // comma-separated
-	AbuseCountry string `json:"abuse_country"`
+	// Abuse contact data (optional; only requested when include_abuse is true).
+	// Exposes every field of the API's `abuse` object as abuse_-prefixed columns
+	// (abuse_route, abuse_country, abuse_name, abuse_organization, abuse_kind,
+	// abuse_address, abuse_emails, abuse_phone_numbers). nil => NULL columns.
+	Abuse *AbuseFields `json:"abuse"`
 }
 
 // IPGeolocationTable returns the table definition for IP geolocation lookups.
 func IPGeolocationTable() *schema.Table {
 	return &schema.Table{
 		Name:        "ipgeolocation_ip_geolocation",
-		Description: "IP Geolocation data from IPGeolocation.io /v3/ipgeo endpoint. Returns location, ASN, company, timezone, network, currency, and optionally security and abuse data for each configured IP address.",
+		Description: "IP Geolocation data from IPGeolocation.io /v3/ipgeo endpoint. Returns location, ASN, company, timezone, network, currency, and optionally the full security object (include_security) and the full abuse contact object (include_abuse) for each configured IP address. Security and abuse columns are NULL when not requested.",
 		Resolver:    fetchIPGeolocation,
-		Transform:   transformers.TransformWithStruct(&IPGeolocationFlat{}, transformers.WithPrimaryKeys("IP")),
+		Transform: transformers.TransformWithStruct(&IPGeolocationFlat{},
+			transformers.WithPrimaryKeys("IP"),
+			transformers.WithUnwrapAllEmbeddedStructs(),
+			transformers.WithUnwrapStructFields("Abuse"),
+			transformers.WithResolverTransformer(nullSafeResolver),
+		),
 	}
 }
 
@@ -116,12 +132,9 @@ func fetchIPGeolocation(ctx context.Context, meta schema.ClientMeta, _ *schema.R
 		ips = []string{""}
 	}
 
-	var includes []string
-	if c.Spec.IncludeSecurity {
-		includes = append(includes, "security")
-	}
-	if c.Spec.IncludeAbuse {
-		includes = append(includes, "abuse")
+	includes, err := c.Spec.IPGeolocationIncludes()
+	if err != nil {
+		return err
 	}
 
 	for _, ip := range ips {
@@ -137,19 +150,35 @@ func fetchIPGeolocation(ctx context.Context, meta schema.ClientMeta, _ *schema.R
 			continue
 		}
 
-		flat := flattenIPGeolocation(geo)
+		flat := flattenIPGeolocation(geo, geoOptions{
+			GeoAccuracy: c.Spec.IncludeGeoAccuracy,
+			DMACode:     c.Spec.IncludeDMACode,
+			Hostname:    c.Spec.IncludeHostname,
+		})
 		res <- flat
 	}
 
 	return nil
 }
 
+// geoOptions says which optional /v3/ipgeo location modules were requested.
+type geoOptions struct {
+	GeoAccuracy bool
+	DMACode     bool
+	Hostname    bool
+}
+
 // flattenIPGeolocation converts the nested API response into a flat struct.
-func flattenIPGeolocation(g *ipgeolocation.IPGeolocation) *IPGeolocationFlat {
+//
+// opts mirrors the spec options: the matching columns are only populated when
+// the module was requested, so NULL means "not fetched".
+func flattenIPGeolocation(g *ipgeolocation.IPGeolocation, opts geoOptions) *IPGeolocationFlat {
 	f := &IPGeolocationFlat{
-		IP:       g.IP,
-		Domain:   g.Domain,
-		Hostname: g.Hostname,
+		IP:     g.IP,
+		Domain: g.Domain,
+	}
+	if opts.Hostname {
+		f.Hostname = strPtr(g.Hostname)
 	}
 
 	if g.Location != nil {
@@ -169,6 +198,14 @@ func flattenIPGeolocation(g *ipgeolocation.IPGeolocation) *IPGeolocationFlat {
 		f.Longitude = g.Location.Longitude
 		f.IsEU = g.Location.IsEU
 		f.GeonameID = g.Location.GeonameID
+		if opts.GeoAccuracy {
+			f.Locality = strPtr(g.Location.Locality)
+			f.AccuracyRadius = strPtr(g.Location.AccuracyRadius)
+			f.Confidence = strPtr(g.Location.Confidence)
+		}
+		if opts.DMACode {
+			f.DMACode = strPtr(g.Location.DMACode)
+		}
 	}
 
 	if g.CountryMetadata != nil {
@@ -181,6 +218,8 @@ func flattenIPGeolocation(g *ipgeolocation.IPGeolocation) *IPGeolocationFlat {
 		f.ConnectionType = g.Network.ConnectionType
 		f.Route = g.Network.Route
 		f.IsAnycast = g.Network.IsAnycast
+		f.IsCDN = g.Network.IsCDN
+		f.CDNProviderName = g.Network.CDNProviderName
 	}
 
 	if g.Currency != nil {
@@ -216,25 +255,13 @@ func flattenIPGeolocation(g *ipgeolocation.IPGeolocation) *IPGeolocationFlat {
 	}
 
 	if g.Security != nil {
-		f.ThreatScore = g.Security.ThreatScore
-		f.IsTor = g.Security.IsTor
-		f.IsProxy = g.Security.IsProxy
-		f.IsResidentialProxy = g.Security.IsResidentialProxy
-		f.IsVPN = g.Security.IsVPN
-		f.IsRelay = g.Security.IsRelay
-		f.IsAnonymous = g.Security.IsAnonymous
-		f.IsKnownAttacker = g.Security.IsKnownAttacker
-		f.IsBot = g.Security.IsBot
-		f.IsSpam = g.Security.IsSpam
-		f.IsCloudProvider = g.Security.IsCloudProvider
-		f.CloudProviderName = g.Security.CloudProviderName
+		sec := newSecurityFields(g.Security)
+		f.SecurityFields = &sec
 	}
 
 	if g.Abuse != nil {
-		f.AbuseRoute = g.Abuse.Route
-		f.AbuseName = g.Abuse.Name
-		f.AbuseEmails = strings.Join(g.Abuse.Emails, ",")
-		f.AbuseCountry = g.Abuse.Country
+		ab := newAbuseFields(g.Abuse)
+		f.Abuse = &ab
 	}
 
 	return f

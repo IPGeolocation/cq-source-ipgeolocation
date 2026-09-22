@@ -39,9 +39,19 @@ spec:
       - "curl/8.4.0"
       - "Googlebot/2.1 (+http://www.google.com/bot.html)"
 
+    # Optional ASN modules (default: none). "*" = peers, upstreams, downstreams,
+    # routes and whois_response. Use a narrower list to keep the ASN table small.
+    asn_include: ["*"]
+
     # Enrich the main geolocation table with security + abuse (paid plans).
     include_security: true
     include_abuse: true
+
+    # More optional geolocation modules (paid plans, no extra credits).
+    include_geo_accuracy: true   # locality, accuracy_radius, confidence
+    include_dma_code: true       # US Designated Market Area code
+    include_hostname: true       # reverse-DNS hostname
+    hostname_lookup: "fallback_live"   # database | live | fallback_live
 
     # Tuning
     concurrency: 5

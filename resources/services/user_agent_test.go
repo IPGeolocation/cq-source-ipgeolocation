@@ -40,8 +40,12 @@ func TestFetchUserAgent(t *testing.T) {
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Official API: POST /v3/user-agent with a JSON body {"uaString": "..."}.
+		assert.Equal(t, http.MethodPost, r.Method)
 		assert.Equal(t, "/v3/user-agent", r.URL.Path)
-		assert.NotEmpty(t, r.URL.Query().Get("ua"))
+		var body map[string]string
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", body["uaString"])
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(mockResponse)

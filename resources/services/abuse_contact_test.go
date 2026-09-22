@@ -113,3 +113,52 @@ func TestFetchAbuseContactAPIError(t *testing.T) {
 	}
 	assert.Equal(t, 0, count)
 }
+
+// Example from the official IP Abuse Contact API docs (Hetzner, 49.12.0.0):
+// every one of the 8 abuse fields is populated.
+func TestFetchAbuseContactAllFields(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"ip": "49.12.0.0",
+			"abuse": map[string]interface{}{
+				"route":         "49.12.0.0/20",
+				"country":       "DE",
+				"name":          "Hetzner Online GmbH - Contact Role",
+				"organization":  "Hetzner Online GmbH",
+				"kind":          "group",
+				"address":       "Hetzner Online GmbH, Industriestrasse 25, D-91710 Gunzenhausen, Germany",
+				"emails":        []string{"abuse@hetzner.com"},
+				"phone_numbers": []string{"+4998315053", " +4998315050"},
+			},
+		})
+	})
+
+	c, cleanup := client.TestClient(t, handler)
+	defer cleanup()
+	c.Spec.IPs = []string{"49.12.0.0"}
+
+	results := make(chan any, 1)
+	require.NoError(t, fetchAbuseContact(context.Background(), c, nil, results))
+	close(results)
+
+	row := resolveRow(t, buildTable(t, AbuseContactTable()), <-results)
+
+	want := map[string]any{
+		"ip":            "49.12.0.0",
+		"route":         "49.12.0.0/20",
+		"country":       "DE",
+		"name":          "Hetzner Online GmbH - Contact Role",
+		"organization":  "Hetzner Online GmbH",
+		"kind":          "group",
+		"address":       "Hetzner Online GmbH, Industriestrasse 25, D-91710 Gunzenhausen, Germany",
+		"emails":        "abuse@hetzner.com",
+		"phone_numbers": "+4998315053, +4998315050",
+	}
+	for col, v := range want {
+		require.Contains(t, row, col)
+		assert.True(t, row[col].IsValid(), "column %s should not be NULL", col)
+		assert.Equal(t, v, row[col].Get(), "column %s", col)
+	}
+	assert.Len(t, row, 9, "8 abuse fields + ip")
+}

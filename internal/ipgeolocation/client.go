@@ -95,6 +95,16 @@ func (c *Client) doRequest(ctx context.Context, method, path string, params url.
 
 	reqURL := fmt.Sprintf("%s%s?%s", c.endpoint, path, params.Encode())
 
+	// Buffer the body once: an io.Reader is consumed by the first attempt, so
+	// each retry needs a fresh reader or it would send an empty body.
+	var bodyBytes []byte
+	if body != nil {
+		var err error
+		if bodyBytes, err = io.ReadAll(body); err != nil {
+			return fmt.Errorf("reading request body: %w", err)
+		}
+	}
+
 	var lastErr error
 	for attempt := 0; attempt <= c.retries; attempt++ {
 		if attempt > 0 {
@@ -110,13 +120,18 @@ func (c *Client) doRequest(ctx context.Context, method, path string, params url.
 			return fmt.Errorf("rate limiter: %w", err)
 		}
 
-		req, err := http.NewRequestWithContext(ctx, method, reqURL, body)
+		var reqBody io.Reader
+		if bodyBytes != nil {
+			reqBody = bytes.NewReader(bodyBytes)
+		}
+
+		req, err := http.NewRequestWithContext(ctx, method, reqURL, reqBody)
 		if err != nil {
 			return fmt.Errorf("creating request: %w", err)
 		}
 		req.Header.Set("User-Agent", c.userAgent)
 		req.Header.Set("Accept", "application/json")
-		if body != nil {
+		if bodyBytes != nil {
 			req.Header.Set("Content-Type", "application/json")
 		}
 
@@ -329,13 +344,17 @@ func (c *Client) GetAbuseContact(ctx context.Context, ip string) (*AbuseContactR
 }
 
 // GetASNByIP looks up detailed ASN information for an IP via the dedicated endpoint.
-// Includes routes, peers, upstreams, and downstreams.
-func (c *Client) GetASNByIP(ctx context.Context, ip string) (*ASNResponse, error) {
+//
+// includes selects the optional /v3/asn modules to request (see the
+// ASNInclude* constants). With none, the API returns only the base ASN fields,
+// which keeps the payload small; peers, upstreams, downstreams, routes and
+// whois_response are never requested unless asked for.
+func (c *Client) GetASNByIP(ctx context.Context, ip string, includes ...string) (*ASNResponse, error) {
 	params := url.Values{}
 	if ip != "" {
 		params.Set("ip", ip)
 	}
-	params.Set("include", "peers,upstreams,downstreams,routes")
+	setASNInclude(params, includes)
 
 	var result ASNResponse
 	if err := c.doRequest(ctx, http.MethodGet, "/v3/asn", params, nil, &result); err != nil {
@@ -345,14 +364,23 @@ func (c *Client) GetASNByIP(ctx context.Context, ip string) (*ASNResponse, error
 }
 
 // GetASNByNumber looks up detailed ASN information by AS number.
-func (c *Client) GetASNByNumber(ctx context.Context, asn string) (*ASNResponse, error) {
+// includes behaves as documented on GetASNByIP.
+func (c *Client) GetASNByNumber(ctx context.Context, asn string, includes ...string) (*ASNResponse, error) {
 	params := url.Values{}
 	params.Set("asn", asn)
-	params.Set("include", "peers,upstreams,downstreams,routes")
+	setASNInclude(params, includes)
 
 	var result ASNResponse
 	if err := c.doRequest(ctx, http.MethodGet, "/v3/asn", params, nil, &result); err != nil {
 		return nil, fmt.Errorf("get asn for %q: %w", asn, err)
 	}
 	return &result, nil
+}
+
+// setASNInclude adds the `include` parameter only when at least one module was
+// requested, so the default request stays a plain, minimal lookup.
+func setASNInclude(params url.Values, includes []string) {
+	if len(includes) > 0 {
+		params.Set("include", strings.Join(includes, ","))
+	}
 }

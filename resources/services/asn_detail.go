@@ -12,8 +12,12 @@ import (
 )
 
 // ASNDetailFlat is a flattened ASN detail response for CloudQuery columns.
-// The dedicated /v3/asn endpoint returns richer data than the basic asn object
-// inside /v3/ipgeo, including routes, peers, upstreams, and downstreams.
+//
+// The base columns are always populated. The last five (routes, peers,
+// upstreams, downstreams, whois_response) are optional modules of the /v3/asn
+// endpoint that can be very large, so they are fetched only when listed in the
+// asn_include spec option. They are NULL when not requested, and an empty
+// string when requested but the ASN has none.
 type ASNDetailFlat struct {
 	QueryIP          string `json:"query_ip"`
 	QueryASN         string `json:"query_asn"`
@@ -28,24 +32,37 @@ type ASNDetailFlat struct {
 	NumIPv4Routes    string `json:"num_of_ipv4_routes"`
 	NumIPv6Routes    string `json:"num_of_ipv6_routes"`
 	RIR              string `json:"rir"`
-	Routes           string `json:"routes"`      // comma-separated CIDR prefixes
-	Peers            string `json:"peers"`       // comma-separated AS numbers
-	Upstreams        string `json:"upstreams"`   // comma-separated AS numbers
-	Downstreams      string `json:"downstreams"` // comma-separated AS numbers
+
+	// Optional modules (asn_include). NULL unless requested.
+	Routes        *string `json:"routes"`         // comma-separated CIDR prefixes
+	Peers         *string `json:"peers"`          // comma-separated AS numbers
+	Upstreams     *string `json:"upstreams"`      // comma-separated AS numbers
+	Downstreams   *string `json:"downstreams"`    // comma-separated AS numbers
+	WhoisResponse *string `json:"whois_response"` // raw WHOIS record text
 }
 
 // ASNDetailTable returns the table definition for detailed ASN lookups.
 func ASNDetailTable() *schema.Table {
 	return &schema.Table{
 		Name:        "ipgeolocation_asn",
-		Description: "Detailed ASN (Autonomous System Number) data from IPGeolocation.io /v3/asn endpoint. Returns the AS name, organization, allocation status, IPv4/IPv6 route counts, and network relationships (peers, upstreams, downstreams, routes) for each configured IP or ASN. Costs 1 credit per lookup.",
+		Description: "Detailed ASN (Autonomous System Number) data from IPGeolocation.io /v3/asn endpoint. Returns the AS name, organization, type, allocation status and IPv4/IPv6 route counts for each configured IP or ASN. The large network-relationship modules (peers, upstreams, downstreams, routes) and the raw WHOIS text are opt-in: list the ones you want in the asn_include spec option; the matching columns are NULL otherwise. Costs 1 credit per lookup.",
 		Resolver:    fetchASNDetail,
-		Transform:   transformers.TransformWithStruct(&ASNDetailFlat{}, transformers.WithPrimaryKeys("QueryIP", "QueryASN")),
+		Transform: transformers.TransformWithStruct(&ASNDetailFlat{},
+			transformers.WithPrimaryKeys("QueryIP", "QueryASN"),
+			transformers.WithResolverTransformer(nullSafeResolver),
+		),
 	}
 }
 
 func fetchASNDetail(ctx context.Context, meta schema.ClientMeta, _ *schema.Resource, res chan<- any) error {
 	c := meta.(*client.Client)
+
+	// Optional modules to request (peers, upstreams, ...). Empty by default so
+	// the API returns only the compact base response.
+	includes, err := c.Spec.ASNIncludeModules()
+	if err != nil {
+		return err
+	}
 
 	// Look up ASN details for each configured IP.
 	ips := c.Spec.IPs
@@ -60,7 +77,7 @@ func fetchASNDetail(ctx context.Context, meta schema.ClientMeta, _ *schema.Resou
 		default:
 		}
 
-		resp, err := c.IPGeo.GetASNByIP(ctx, ip)
+		resp, err := c.IPGeo.GetASNByIP(ctx, ip, includes...)
 		if err != nil {
 			c.Logger.Warn().Str("ip", ip).Err(err).Msg("failed to fetch ASN detail, skipping")
 			continue
@@ -69,7 +86,7 @@ func fetchASNDetail(ctx context.Context, meta schema.ClientMeta, _ *schema.Resou
 			continue
 		}
 
-		flat := flattenASNDetail(ip, "", resp.ASN)
+		flat := flattenASNDetail(ip, "", resp.ASN, includes)
 		res <- flat
 	}
 
@@ -81,7 +98,7 @@ func fetchASNDetail(ctx context.Context, meta schema.ClientMeta, _ *schema.Resou
 		default:
 		}
 
-		resp, err := c.IPGeo.GetASNByNumber(ctx, asn)
+		resp, err := c.IPGeo.GetASNByNumber(ctx, asn, includes...)
 		if err != nil {
 			c.Logger.Warn().Str("asn", asn).Err(err).Msg("failed to fetch ASN detail, skipping")
 			continue
@@ -90,14 +107,14 @@ func fetchASNDetail(ctx context.Context, meta schema.ClientMeta, _ *schema.Resou
 			continue
 		}
 
-		flat := flattenASNDetail("", asn, resp.ASN)
+		flat := flattenASNDetail("", asn, resp.ASN, includes)
 		res <- flat
 	}
 
 	return nil
 }
 
-func flattenASNDetail(ip, queryASN string, a *ipgeolocation.ASNDetail) *ASNDetailFlat {
+func flattenASNDetail(ip, queryASN string, a *ipgeolocation.ASNDetail, includes []string) *ASNDetailFlat {
 	f := &ASNDetailFlat{
 		QueryIP:          ip,
 		QueryASN:         queryASN,
@@ -112,28 +129,35 @@ func flattenASNDetail(ip, queryASN string, a *ipgeolocation.ASNDetail) *ASNDetai
 		NumIPv4Routes:    a.NumIPv4Routes,
 		NumIPv6Routes:    a.NumIPv6Routes,
 		RIR:              a.RIR,
-		Routes:           strings.Join(a.Routes, ","),
 	}
 
-	peerNums := make([]string, len(a.Peers))
-	for i, p := range a.Peers {
-		peerNums[i] = p.ASNumber
+	// Only populate the optional modules that were requested; everything else
+	// stays nil (NULL) so "not fetched" is distinguishable from "none".
+	for _, inc := range includes {
+		switch inc {
+		case ipgeolocation.ASNIncludeRoutes:
+			f.Routes = strPtr(strings.Join(a.Routes, ","))
+		case ipgeolocation.ASNIncludePeers:
+			f.Peers = strPtr(joinASNumbers(a.Peers))
+		case ipgeolocation.ASNIncludeUpstreams:
+			f.Upstreams = strPtr(joinASNumbers(a.Upstreams))
+		case ipgeolocation.ASNIncludeDownstreams:
+			f.Downstreams = strPtr(joinASNumbers(a.Downstreams))
+		case ipgeolocation.ASNIncludeWhoisResponse:
+			f.WhoisResponse = strPtr(a.WhoisResponse)
+		}
 	}
-	f.Peers = strings.Join(peerNums, ",")
-
-	upNums := make([]string, len(a.Upstreams))
-	for i, u := range a.Upstreams {
-		upNums[i] = u.ASNumber
-	}
-	f.Upstreams = strings.Join(upNums, ",")
-
-	downNums := make([]string, len(a.Downstreams))
-	for i, d := range a.Downstreams {
-		downNums[i] = d.ASNumber
-	}
-	f.Downstreams = strings.Join(downNums, ",")
 
 	return f
+}
+
+// joinASNumbers joins the AS numbers of a peer/upstream/downstream list with commas.
+func joinASNumbers(rels []ipgeolocation.ASNRelation) string {
+	nums := make([]string, len(rels))
+	for i, r := range rels {
+		nums[i] = r.ASNumber
+	}
+	return strings.Join(nums, ",")
 }
 
 // joinStrings is a shared helper to join string slices with commas.

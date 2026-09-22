@@ -34,6 +34,14 @@ spec:
       - "24940"              # Hetzner (hosting, many routes)
       - "13335"              # Cloudflare (CDN/anycast)
 
+    # Optional ASN modules. Omit for compact rows (base fields only).
+    # Allowed: peers, upstreams, downstreams, routes, whois_response, or "*" for all.
+    # Unselected columns stay NULL. Big transit ASNs (e.g. AS1) can have thousands
+    # of peers/routes, so only request what you actually analyse.
+    asn_include:
+      - "upstreams"
+      - "downstreams"
+
     rate_limit: 5
 ---
 kind: destination
@@ -51,10 +59,10 @@ spec:
 # FROM ipgeolocation_asn
 # ORDER BY CAST(num_of_ipv4_routes AS INTEGER) DESC;
 #
-# -- Show all upstream providers for each ASN
+# -- Show all upstream providers for each ASN (needs asn_include: ["upstreams"])
 # SELECT as_number, organization, upstreams
 # FROM ipgeolocation_asn
-# WHERE upstreams != '';
+# WHERE upstreams IS NOT NULL AND upstreams != '';
 #
 # -- Find abuse contacts with email addresses
 # SELECT ip, name, emails, phone_numbers

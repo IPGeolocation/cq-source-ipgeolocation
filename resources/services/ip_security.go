@@ -11,36 +11,22 @@ import (
 )
 
 // IPSecurityFlat is a flattened security/threat response for CloudQuery columns.
+// It exposes every field of the API's `security` object (see SecurityFields).
 type IPSecurityFlat struct {
-	IP                   string `json:"ip"`
-	ThreatScore          int    `json:"threat_score"`
-	IsTor                bool   `json:"is_tor"`
-	IsProxy              bool   `json:"is_proxy"`
-	ProxyProviderNames   string `json:"proxy_provider_names"`
-	ProxyConfidenceScore int    `json:"proxy_confidence_score"`
-	ProxyLastSeen        string `json:"proxy_last_seen"`
-	IsResidentialProxy   bool   `json:"is_residential_proxy"`
-	IsVPN                bool   `json:"is_vpn"`
-	VPNProviderNames     string `json:"vpn_provider_names"`
-	VPNConfidenceScore   int    `json:"vpn_confidence_score"`
-	VPNLastSeen          string `json:"vpn_last_seen"`
-	IsRelay              bool   `json:"is_relay"`
-	RelayProviderName    string `json:"relay_provider_name"`
-	IsAnonymous          bool   `json:"is_anonymous"`
-	IsKnownAttacker      bool   `json:"is_known_attacker"`
-	IsBot                bool   `json:"is_bot"`
-	IsSpam               bool   `json:"is_spam"`
-	IsCloudProvider      bool   `json:"is_cloud_provider"`
-	CloudProviderName    string `json:"cloud_provider_name"`
+	IP string `json:"ip"`
+	SecurityFields
 }
 
 // IPSecurityTable returns the table definition for dedicated IP security lookups.
 func IPSecurityTable() *schema.Table {
 	return &schema.Table{
 		Name:        "ipgeolocation_ip_security",
-		Description: "IP security and threat intelligence from IPGeolocation.io /v3/security endpoint. Returns threat score, VPN/proxy/Tor detection, bot classification, and provider attribution for each configured IP. Requires a paid plan. Costs 2 credits per lookup.",
+		Description: "IP security and threat intelligence from IPGeolocation.io /v3/security endpoint. Returns the full security object: threat score; VPN, proxy, residential proxy, Tor and relay detection with provider names, confidence scores and last-seen dates; bot classification (type, operator, known-good-bot flag); spam and known-attacker flags; cloud provider and corporate gateway attribution. Requires a paid plan. Costs 2 credits per lookup.",
 		Resolver:    fetchIPSecurity,
-		Transform:   transformers.TransformWithStruct(&IPSecurityFlat{}, transformers.WithPrimaryKeys("IP")),
+		Transform: transformers.TransformWithStruct(&IPSecurityFlat{},
+			transformers.WithPrimaryKeys("IP"),
+			transformers.WithUnwrapAllEmbeddedStructs(),
+		),
 	}
 }
 
@@ -83,25 +69,7 @@ func fetchIPSecurity(ctx context.Context, meta schema.ClientMeta, _ *schema.Reso
 
 func flattenSecurity(ip string, s *ipgeolocation.Security) *IPSecurityFlat {
 	return &IPSecurityFlat{
-		IP:                   ip,
-		ThreatScore:          s.ThreatScore,
-		IsTor:                s.IsTor,
-		IsProxy:              s.IsProxy,
-		ProxyProviderNames:   joinStrings(s.ProxyProviderNames),
-		ProxyConfidenceScore: s.ProxyConfidenceScore,
-		ProxyLastSeen:        s.ProxyLastSeen,
-		IsResidentialProxy:   s.IsResidentialProxy,
-		IsVPN:                s.IsVPN,
-		VPNProviderNames:     joinStrings(s.VPNProviderNames),
-		VPNConfidenceScore:   s.VPNConfidenceScore,
-		VPNLastSeen:          s.VPNLastSeen,
-		IsRelay:              s.IsRelay,
-		RelayProviderName:    s.RelayProviderName,
-		IsAnonymous:          s.IsAnonymous,
-		IsKnownAttacker:      s.IsKnownAttacker,
-		IsBot:                s.IsBot,
-		IsSpam:               s.IsSpam,
-		IsCloudProvider:      s.IsCloudProvider,
-		CloudProviderName:    s.CloudProviderName,
+		IP:             ip,
+		SecurityFields: newSecurityFields(s),
 	}
 }

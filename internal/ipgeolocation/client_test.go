@@ -3,8 +3,10 @@ package ipgeolocation
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"sync/atomic"
 	"testing"
 
@@ -139,8 +141,14 @@ func TestGetAstronomySuccess(t *testing.T) {
 
 func TestGetUserAgentSuccess(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Official API: POST /v3/user-agent with a JSON body {"uaString": "..."}.
+		assert.Equal(t, http.MethodPost, r.Method)
 		assert.Equal(t, "/v3/user-agent", r.URL.Path)
-		assert.NotEmpty(t, r.URL.Query().Get("ua"))
+		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+		assert.Equal(t, "test-key", r.URL.Query().Get("apiKey"))
+		var body map[string]string
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "test-ua", body["uaString"])
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"user_agent_string": "test-ua",
@@ -194,4 +202,113 @@ func TestAPIErrorRetryable(t *testing.T) {
 		e := &APIError{StatusCode: tt.code}
 		assert.Equal(t, tt.retryable, e.IsRetryable(), "status %d", tt.code)
 	}
+}
+
+func TestGetASNIncludeParameter(t *testing.T) {
+	var got url.Values
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/v3/asn", r.URL.Path)
+		got = r.URL.Query()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"asn": map[string]interface{}{
+				"as_number":      "AS12",
+				"whois_response": "ASNumber: 12",
+				"peers":          []map[string]string{{"as_number": "AS3356", "description": "Level 3", "country": "US"}},
+			},
+		})
+	})
+	c, server := newTestClient(t, handler)
+	defer server.Close()
+
+	// No modules requested: no include parameter, by number and by IP.
+	_, err := c.GetASNByNumber(context.Background(), "12")
+	require.NoError(t, err)
+	assert.False(t, got.Has("include"))
+	assert.Equal(t, "12", got.Get("asn"))
+
+	_, err = c.GetASNByIP(context.Background(), "8.8.8.8")
+	require.NoError(t, err)
+	assert.False(t, got.Has("include"))
+	assert.Equal(t, "8.8.8.8", got.Get("ip"))
+
+	// Modules requested: sent comma-separated, and the response is decoded.
+	resp, err := c.GetASNByNumber(context.Background(), "12", ASNIncludePeers, ASNIncludeWhoisResponse)
+	require.NoError(t, err)
+	assert.Equal(t, "peers,whois_response", got.Get("include"))
+	assert.Equal(t, "ASNumber: 12", resp.ASN.WhoisResponse)
+	require.Len(t, resp.ASN.Peers, 1)
+	assert.Equal(t, "AS3356", resp.ASN.Peers[0].ASNumber)
+
+	_, err = c.GetASNByIP(context.Background(), "", ASNIncludeRoutes)
+	require.NoError(t, err)
+	assert.Equal(t, "routes", got.Get("include"))
+	assert.False(t, got.Has("ip"), "empty ip means caller IP: no ip param")
+}
+
+func TestGetSecurityDecodesAllFields(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"ip":"87.58.66.106","security":{
+			"threat_score":5,"is_bot":true,"bot_confidence_score":95,"bot_operator_name":"ChatGPT",
+			"bot_type":"ai_crawler","is_known_good_bot":true,"bot_last_seen":"2026-09-03",
+			"is_cloud_provider":true,"cloud_provider_name":"Zscaler Switzerland GmbH",
+			"is_corporate_gateway":true,"corporate_gateway_type":"secure_web_gateway",
+			"corporate_gateway_provider_name":"Zscaler"}}`))
+	})
+	c, server := newTestClient(t, handler)
+	defer server.Close()
+
+	resp, err := c.GetSecurity(context.Background(), "87.58.66.106")
+	require.NoError(t, err)
+	s := resp.Security
+	require.NotNil(t, s)
+	assert.Equal(t, 95, s.BotConfidenceScore)
+	assert.Equal(t, "ChatGPT", s.BotOperatorName)
+	assert.Equal(t, "ai_crawler", s.BotType)
+	assert.True(t, s.IsKnownGoodBot)
+	assert.Equal(t, "2026-09-03", s.BotLastSeen)
+	assert.True(t, s.IsCorporateGateway)
+	assert.Equal(t, "secure_web_gateway", s.CorporateGatewayType)
+	assert.Equal(t, "Zscaler", s.CorporateGatewayProviderName)
+}
+
+func TestGetIPGeolocationDecodesNetworkCDN(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"ip":"104.16.0.1","network":{"route":"104.16.0.0/13","is_cdn":true,"cdn_provider_name":"Cloudflare"}}`))
+	})
+	c, server := newTestClient(t, handler)
+	defer server.Close()
+
+	geo, err := c.GetIPGeolocation(context.Background(), "104.16.0.1")
+	require.NoError(t, err)
+	assert.True(t, geo.Network.IsCDN)
+	assert.Equal(t, "Cloudflare", geo.Network.CDNProviderName)
+}
+
+// A retried POST must re-send its body: the reader is consumed by the first attempt.
+func TestPostBodyIsResentOnRetry(t *testing.T) {
+	var bodies []string
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		bodies = append(bodies, string(raw))
+		w.Header().Set("Content-Type", "application/json")
+		if len(bodies) == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable) // retryable
+			w.Write([]byte(`{"message":"try again"}`))
+			return
+		}
+		w.Write([]byte(`{"user_agent_string":"retry-ua","name":"Chrome"}`))
+	})
+	c, server := newTestClient(t, handler) // WithRetries(1)
+	defer server.Close()
+
+	ua, err := c.GetUserAgent(context.Background(), "retry-ua")
+	require.NoError(t, err)
+	assert.Equal(t, "Chrome", ua.Name)
+
+	require.Len(t, bodies, 2, "expected one failed attempt and one retry")
+	assert.JSONEq(t, `{"uaString":"retry-ua"}`, bodies[0])
+	assert.JSONEq(t, `{"uaString":"retry-ua"}`, bodies[1], "retry must carry the same body")
 }

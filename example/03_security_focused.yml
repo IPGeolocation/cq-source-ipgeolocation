@@ -67,3 +67,13 @@ spec:
 # FROM ipgeolocation_ip_geolocation g
 # JOIN ipgeolocation_ip_security s ON g.ip = s.ip
 # WHERE s.threat_score > 30;
+#
+# -- Bots: separate declared/good crawlers from unrecognised automation
+# SELECT ip, bot_type, bot_operator_name, bot_confidence_score, bot_last_seen
+# FROM ipgeolocation_ip_security
+# WHERE is_bot = 1 AND is_known_good_bot = 0;
+#
+# -- Corporate gateway egress IPs (shared by many employees; don't block)
+# SELECT ip, corporate_gateway_provider_name, corporate_gateway_type
+# FROM ipgeolocation_ip_security
+# WHERE is_corporate_gateway = 1;
