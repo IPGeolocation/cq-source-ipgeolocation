@@ -4,7 +4,7 @@ A [CloudQuery](https://cloudquery.io) source plugin that pulls IP intelligence f
 
 Point it at a list of IP addresses, AS numbers, or user agent strings. It returns geolocation, network and ASN ownership, VPN and proxy detection, threat scores, abuse contacts, and parsed browser data as ordinary database tables you can join against your own logs.
 
-Full documentation lives in [`docs/`](docs/). Start with the [integration guide](docs/integration-guide.md) if you want the end to end walkthrough.
+Full documentation lives in [`docs/`](docs/).
 
 ## Tables
 
