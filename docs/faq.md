@@ -62,7 +62,7 @@ Build it and serve it locally over gRPC for now, as the bundled examples do. Onc
 
 ## Which Go version do I need to build it?
 
-Go 1.22.7 or later, matching the `go` directive in `go.mod`.
+Go 1.26.5 or later, matching the `go` directive in `go.mod`.
 
 ## Do the tests need an API key?
 
