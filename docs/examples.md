@@ -120,7 +120,7 @@ cd cq-source-ipgeolocation
 go build -o cq-source-ipgeolocation
 ```
 
-Go 1.22.7 or later is required.
+Go 1.26.5 or later is required.
 
 ## Running Tests
 

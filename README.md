@@ -21,7 +21,7 @@ Column by column reference: [`docs/tables.md`](docs/tables.md).
 ## Requirements
 
 - [CloudQuery CLI](https://docs.cloudquery.io/docs/quickstart) v5 or later
-- Go 1.22.7 or later, to build the plugin binary
+- Go 1.26.5 or later, to build the plugin binary
 - An IPGeolocation.io API key. The free Developer plan gives you 1,000 requests a day and covers the geolocation table. Sign up at [app.ipgeolocation.io/signup](https://app.ipgeolocation.io/signup).
 
 ## Quick Start
