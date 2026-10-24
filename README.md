@@ -24,6 +24,10 @@ Column by column reference: [`docs/tables.md`](docs/tables.md).
 - Go 1.26.5 or later, to build the plugin binary
 - An IPGeolocation.io API key. The free Developer plan gives you 1,000 requests a day and covers the geolocation table. Sign up at [app.ipgeolocation.io/signup](https://app.ipgeolocation.io/signup).
 
+Build release binaries with a patched Go toolchain: Go 1.26.10 or later on the
+1.26 line, or Go 1.27.3 or later. Updating modules does not patch the standard
+library embedded in an existing binary; rebuild and replace deployed binaries.
+
 ## Quick Start
 
 ```bash
