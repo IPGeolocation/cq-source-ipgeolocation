@@ -122,12 +122,19 @@ The `example/` directory has eight configs you can run as is.
 ## Development
 
 ```bash
-go build ./...     # compile
-go test ./... -v   # unit tests, no API key needed
+go build ./...
+go test -race -count=1 ./...
+go test -race -tags=http2legacy -count=1 ./...
 go vet ./...
 ```
 
-The tests use a stub HTTP server, so they run offline and make no API calls.
+Tests use local HTTP servers and need no API key. The plugin sync integration test
+runs all five tables through configuration, scheduling and Arrow row emission,
+including optional modules, table filtering and caller-IP lookup. The legacy
+transport run also exercises the x/net HTTP/2 implementation on Go 1.27.
+
+Linux CI runs both test modes, module verification, vet, a build and govulncheck
+on Go 1.26.10 and 1.27.3.
 
 ## License
 
