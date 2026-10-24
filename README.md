@@ -24,6 +24,10 @@ Column by column reference: [`docs/tables.md`](docs/tables.md).
 - Go 1.26.5 or later, to build the plugin binary
 - An IPGeolocation.io API key. The free Developer plan gives you 1,000 requests a day and covers the geolocation table. Sign up at [app.ipgeolocation.io/signup](https://app.ipgeolocation.io/signup).
 
+Build release binaries with a patched Go toolchain: Go 1.26.10 or later on the
+1.26 line, or Go 1.27.3 or later. Updating modules does not patch the standard
+library embedded in an existing binary; rebuild and replace deployed binaries.
+
 ## Quick Start
 
 ```bash
@@ -118,12 +122,19 @@ The `example/` directory has eight configs you can run as is.
 ## Development
 
 ```bash
-go build ./...     # compile
-go test ./... -v   # unit tests, no API key needed
+go build ./...
+go test -race -count=1 ./...
+go test -race -tags=http2legacy -count=1 ./...
 go vet ./...
 ```
 
-The tests use a stub HTTP server, so they run offline and make no API calls.
+Tests use local HTTP servers and need no API key. The plugin sync integration test
+runs all five tables through configuration, scheduling and Arrow row emission,
+including optional modules, table filtering and caller-IP lookup. The legacy
+transport run also exercises the x/net HTTP/2 implementation on Go 1.27.
+
+Linux CI runs both test modes, module verification, vet, a build and govulncheck
+on Go 1.26.10 and 1.27.3.
 
 ## License
 
