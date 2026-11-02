@@ -105,10 +105,10 @@ spec:
 
 ```bash
 cloudquery sync check.yml
-sqlite3 check.db "SELECT ip, country_name, city, company_name FROM ipgeolocation_ip_geolocation;"
+sqlite3 check.db "SELECT ip, country_name, city, asn_organization FROM ipgeolocation_ip_geolocation;"
 ```
 
-A row naming the United States and Google confirms the key, the plugin and the destination are all working.
+A row naming the United States and Google confirms the key, the plugin and the destination are all working. `asn_organization` is part of the free response; `company_name` needs a paid plan, so it is left out of this check.
 
 ## Getting Help
 

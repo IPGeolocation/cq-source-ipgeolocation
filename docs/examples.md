@@ -91,14 +91,16 @@ FROM ipgeolocation_abuse_contact
 WHERE emails != '';
 ```
 
-### Mobile traffic by operating system
+### Mobile user agents by operating system
+
+The table holds one row per distinct user agent string, so this counts distinct strings, not requests. For request counts, join the table to your access log on `user_agent_string`.
 
 ```sql
-SELECT os_name, os_version_major, device_brand, COUNT(*) AS hits
+SELECT os_name, os_version_major, device_brand, COUNT(*) AS distinct_user_agents
 FROM ipgeolocation_user_agent
 WHERE device_type = 'Mobile'
 GROUP BY os_name, os_version_major, device_brand
-ORDER BY hits DESC;
+ORDER BY distinct_user_agents DESC;
 ```
 
 ### Country breakdown
