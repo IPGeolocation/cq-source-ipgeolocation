@@ -14,7 +14,7 @@ Every table also carries the CloudQuery system columns `_cq_id` and `_cq_parent_
 
 ## ipgeolocation_ip_geolocation
 
-One row per entry in `ips`, or a single row for the caller's public IP when `ips` is empty. Source: [IP Geolocation API](https://ipgeolocation.io/documentation/ip-geolocation-api.html).
+One row per entry in `ips`, or a single row for the caller's public IP when `ips` is empty. Works on the free plan; columns marked Paid below need a paid plan. Source: [IP Geolocation API](https://ipgeolocation.io/documentation/ip-location-api.html).
 
 ### Identity
 
@@ -66,11 +66,11 @@ Latitude, longitude and accuracy radius come back from the API as strings and ar
 
 | Column | Type | Description |
 |---|---|---|
-| `connection_type` | text | Connection type reported for the network |
-| `route` | text | CIDR block the IP belongs to |
-| `is_anycast` | boolean | True when the prefix is anycast |
-| `is_cdn` | boolean | True when the IP belongs to a CDN |
-| `cdn_provider_name` | text | CDN operator name |
+| `connection_type` | text | Connection type reported for the network. Paid |
+| `route` | text | CIDR block the IP belongs to. Paid |
+| `is_anycast` | boolean | True when the prefix is anycast. Paid |
+| `is_cdn` | boolean | True when the IP belongs to a CDN. Paid |
+| `cdn_provider_name` | text | CDN operator name. Paid |
 
 ### ASN and company
 
@@ -79,21 +79,21 @@ Latitude, longitude and accuracy radius come back from the API as strings and ar
 | `as_number` | text | AS number, for example `AS15169` |
 | `asn_organization` | text | Organization that holds the AS number |
 | `asn_country` | text | Country of registration |
-| `asn_type` | text | ASN type, such as ISP, HOSTING, EDUCATION, GOVERNMENT or BUSINESS |
-| `asn_domain` | text | Primary domain of the organization |
-| `asn_date_allocated` | text | Allocation date |
-| `asn_rir` | text | Regional Internet Registry: ARIN, RIPE, APNIC, LACNIC or AFRINIC |
-| `company_name` | text | Company operating the IP |
-| `company_type` | text | Company type |
-| `company_domain` | text | Company domain |
+| `asn_type` | text | ASN type, such as ISP, HOSTING, EDUCATION, GOVERNMENT or BUSINESS. Paid |
+| `asn_domain` | text | Primary domain of the organization. Paid |
+| `asn_date_allocated` | text | Allocation date. Paid |
+| `asn_rir` | text | Regional Internet Registry: ARIN, RIPE, APNIC, LACNIC or AFRINIC. Paid |
+| `company_name` | text | Company operating the IP. Paid |
+| `company_type` | text | Company type. Paid |
+| `company_domain` | text | Company domain. Paid |
 
 ### Timezone
 
 | Column | Type | Description |
 |---|---|---|
 | `timezone_name` | text | IANA timezone name, for example `America/New_York` |
-| `timezone_offset` | double | UTC offset in seconds, ignoring DST |
-| `timezone_offset_with_dst` | double | UTC offset in seconds, including DST |
+| `timezone_offset` | double | UTC offset in hours, ignoring DST; fractional values are possible, for example `5.5` |
+| `timezone_offset_with_dst` | double | UTC offset in hours, including DST; fractional values are possible |
 | `timezone_current_time` | text | Local time at the moment of the lookup |
 | `timezone_current_time_unix` | double | Same moment as a Unix timestamp |
 | `timezone_abbreviation` | text | Timezone abbreviation, for example EST |

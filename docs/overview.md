@@ -21,7 +21,7 @@ The plugin is built for batch enrichment on a schedule rather than for per reque
 - Auditing which countries and networks your known IPs resolve to, for compliance reporting
 - Mapping ASN ownership and transit relationships for a group of prefixes you care about
 
-If you need a lookup inside a request handler, call the [IP Geolocation API](https://ipgeolocation.io/documentation/ip-geolocation-api.html) directly or use one of the [official SDKs](https://ipgeolocation.io/documentation.html#api-sdks) instead. CloudQuery is a batch tool and the sync runs on your schedule, not on your traffic.
+If you need a lookup inside a request handler, call the [IP Geolocation API](https://ipgeolocation.io/documentation/ip-location-api.html) directly or use one of the [official SDKs](https://ipgeolocation.io/documentation.html#api-sdks) instead. CloudQuery is a batch tool and the sync runs on your schedule, not on your traffic.
 
 ## Tables
 
