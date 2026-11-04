@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -17,14 +18,19 @@ import (
 
 const defaultEndpoint = "https://api.ipgeolocation.io"
 
+const DefaultMaxResponseBytes int64 = 256 * 1024 * 1024
+
+var errResponseTooLarge = errors.New("response exceeds the configured size limit")
+
 // Client is a reusable, concurrency-safe HTTP client for the IPGeolocation.io v3 API.
 type Client struct {
-	apiKey     string
-	endpoint   string
-	httpClient *http.Client
-	limiter    *rate.Limiter
-	retries    int
-	userAgent  string
+	apiKey           string
+	endpoint         string
+	httpClient       *http.Client
+	limiter          *rate.Limiter
+	retries          int
+	userAgent        string
+	maxResponseBytes int64
 }
 
 // Option configures a Client.
@@ -37,12 +43,27 @@ func WithEndpoint(endpoint string) Option {
 
 // WithTimeout sets the HTTP client timeout.
 func WithTimeout(d time.Duration) Option {
-	return func(c *Client) { c.httpClient.Timeout = d }
+	return func(c *Client) {
+		if c.httpClient != nil {
+			c.httpClient.Timeout = d
+		}
+	}
+}
+
+func WithMaxResponseBytes(n int64) Option {
+	return func(c *Client) { c.maxResponseBytes = n }
 }
 
 // WithHTTPClient replaces the default HTTP client entirely (useful for tests).
 func WithHTTPClient(hc *http.Client) Option {
-	return func(c *Client) { c.httpClient = hc }
+	return func(c *Client) {
+		if hc == nil {
+			c.httpClient = nil
+			return
+		}
+		copy := *hc
+		c.httpClient = &copy
+	}
 }
 
 // WithRetries sets the maximum number of retry attempts for transient errors.
@@ -74,16 +95,51 @@ func NewClient(apiKey string, opts ...Option) (*Client, error) {
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		limiter:   rate.NewLimiter(15, 15),
-		retries:   3,
-		userAgent: "cq-source-ipgeolocation/1.0",
+		limiter:          rate.NewLimiter(15, 15),
+		retries:          3,
+		userAgent:        "cq-source-ipgeolocation/1.0",
+		maxResponseBytes: DefaultMaxResponseBytes,
 	}
 
 	for _, opt := range opts {
 		opt(c)
 	}
+	if c.httpClient == nil {
+		return nil, fmt.Errorf("ipgeolocation: HTTP client is required")
+	}
+	if c.httpClient.Timeout <= 0 {
+		return nil, fmt.Errorf("ipgeolocation: timeout must be greater than zero")
+	}
+	if c.maxResponseBytes <= 0 || c.maxResponseBytes == math.MaxInt64 {
+		return nil, fmt.Errorf("ipgeolocation: invalid response size limit")
+	}
+	checkRedirect := c.httpClient.CheckRedirect
+	c.httpClient.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		req.Header.Del("Referer")
+		if checkRedirect != nil {
+			err := checkRedirect(req, via)
+			req.Header.Del("Referer")
+			return err
+		}
+		if len(via) >= 10 {
+			return fmt.Errorf("stopped after 10 redirects")
+		}
+		return nil
+	}
 
 	return c, nil
+}
+
+func (c *Client) readResponse(resp *http.Response) ([]byte, error) {
+	defer resp.Body.Close()
+	if resp.ContentLength > c.maxResponseBytes {
+		return nil, errResponseTooLarge
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, c.maxResponseBytes+1))
+	if int64(len(body)) > c.maxResponseBytes {
+		return nil, errResponseTooLarge
+	}
+	return body, err
 }
 
 // doRequest builds, sends, and decodes an API request with retries and rate limiting.
@@ -101,7 +157,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, params url.
 	if body != nil {
 		var err error
 		if bodyBytes, err = io.ReadAll(body); err != nil {
-			return fmt.Errorf("reading request body: %w", err)
+			return fmt.Errorf("reading request body: %w", c.redactError(err))
 		}
 	}
 
@@ -127,7 +183,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, params url.
 
 		req, err := http.NewRequestWithContext(ctx, method, reqURL, reqBody)
 		if err != nil {
-			return fmt.Errorf("creating request: %w", err)
+			return fmt.Errorf("creating request: %w", c.redactError(err))
 		}
 		req.Header.Set("User-Agent", c.userAgent)
 		req.Header.Set("Accept", "application/json")
@@ -137,20 +193,22 @@ func (c *Client) doRequest(ctx context.Context, method, path string, params url.
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
-			lastErr = fmt.Errorf("executing request: %w", err)
+			lastErr = fmt.Errorf("executing request: %w", c.redactError(err))
 			continue
 		}
 
-		respBody, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			lastErr = fmt.Errorf("reading response body: %w", err)
-			continue
-		}
+		respBody, readErr := c.readResponse(resp)
 
 		if resp.StatusCode >= 400 {
 			apiErr := &APIError{StatusCode: resp.StatusCode}
-			_ = json.Unmarshal(respBody, apiErr)
+			if readErr == nil {
+				var payload struct {
+					Message string `json:"message"`
+				}
+				if json.Unmarshal(respBody, &payload) == nil {
+					apiErr.Message = c.redact(payload.Message)
+				}
+			}
 			if apiErr.Message == "" {
 				apiErr.Message = http.StatusText(resp.StatusCode)
 			}
@@ -160,10 +218,17 @@ func (c *Client) doRequest(ctx context.Context, method, path string, params url.
 			}
 			return apiErr
 		}
+		if readErr != nil {
+			if errors.Is(readErr, errResponseTooLarge) {
+				return errResponseTooLarge
+			}
+			lastErr = fmt.Errorf("reading response body: %w", c.redactError(readErr))
+			continue
+		}
 
 		if result != nil {
 			if err := json.Unmarshal(respBody, result); err != nil {
-				return fmt.Errorf("decoding response: %w", err)
+				return fmt.Errorf("decoding response: %w", c.redactError(err))
 			}
 		}
 		return nil
@@ -185,7 +250,7 @@ func (c *Client) GetIPGeolocation(ctx context.Context, ip string, includes ...st
 
 	var result IPGeolocation
 	if err := c.doRequest(ctx, http.MethodGet, "/v3/ipgeo", params, nil, &result); err != nil {
-		return nil, fmt.Errorf("get ip geolocation for %q: %w", ip, err)
+		return nil, fmt.Errorf("get ip geolocation for %q: %w", c.redact(ip), err)
 	}
 	return &result, nil
 }
@@ -222,7 +287,7 @@ func (c *Client) GetTimezone(ctx context.Context, ip string) (*TimezoneResponse,
 
 	var result TimezoneResponse
 	if err := c.doRequest(ctx, http.MethodGet, "/v3/timezone", params, nil, &result); err != nil {
-		return nil, fmt.Errorf("get timezone for %q: %w", ip, err)
+		return nil, fmt.Errorf("get timezone for %q: %w", c.redact(ip), err)
 	}
 	return &result, nil
 }
@@ -234,7 +299,7 @@ func (c *Client) GetTimezoneByLocation(ctx context.Context, location string) (*T
 
 	var result TimezoneResponse
 	if err := c.doRequest(ctx, http.MethodGet, "/v3/timezone", params, nil, &result); err != nil {
-		return nil, fmt.Errorf("get timezone for location %q: %w", location, err)
+		return nil, fmt.Errorf("get timezone for location %q: %w", c.redact(location), err)
 	}
 	return &result, nil
 }
@@ -246,7 +311,7 @@ func (c *Client) GetTimezoneByName(ctx context.Context, tz string) (*TimezoneRes
 
 	var result TimezoneResponse
 	if err := c.doRequest(ctx, http.MethodGet, "/v3/timezone", params, nil, &result); err != nil {
-		return nil, fmt.Errorf("get timezone for tz %q: %w", tz, err)
+		return nil, fmt.Errorf("get timezone for tz %q: %w", c.redact(tz), err)
 	}
 	return &result, nil
 }
@@ -260,7 +325,7 @@ func (c *Client) GetAstronomy(ctx context.Context, ip string) (*AstronomyRespons
 
 	var result AstronomyResponse
 	if err := c.doRequest(ctx, http.MethodGet, "/v3/astronomy", params, nil, &result); err != nil {
-		return nil, fmt.Errorf("get astronomy for %q: %w", ip, err)
+		return nil, fmt.Errorf("get astronomy for %q: %w", c.redact(ip), err)
 	}
 	return &result, nil
 }
@@ -272,7 +337,7 @@ func (c *Client) GetAstronomyByLocation(ctx context.Context, location string) (*
 
 	var result AstronomyResponse
 	if err := c.doRequest(ctx, http.MethodGet, "/v3/astronomy", params, nil, &result); err != nil {
-		return nil, fmt.Errorf("get astronomy for location %q: %w", location, err)
+		return nil, fmt.Errorf("get astronomy for location %q: %w", c.redact(location), err)
 	}
 	return &result, nil
 }
@@ -297,7 +362,7 @@ func (c *Client) GetUserAgent(ctx context.Context, uaString string) (*UserAgentR
 		bytes.NewReader(body),
 		&result,
 	); err != nil {
-		return nil, fmt.Errorf("get user-agent for %q: %w", uaString, err)
+		return nil, fmt.Errorf("get user-agent for %q: %w", c.redact(uaString), err)
 	}
 
 	return &result, nil
@@ -318,7 +383,7 @@ func (c *Client) GetSecurity(ctx context.Context, ip string) (*SecurityResponse,
 
 	var result SecurityResponse
 	if err := c.doRequest(ctx, http.MethodGet, "/v3/security", params, nil, &result); err != nil {
-		return nil, fmt.Errorf("get security for %q: %w", ip, err)
+		return nil, fmt.Errorf("get security for %q: %w", c.redact(ip), err)
 	}
 	return &result, nil
 }
@@ -338,7 +403,7 @@ func (c *Client) GetAbuseContact(ctx context.Context, ip string) (*AbuseContactR
 
 	var result AbuseContactResponse
 	if err := c.doRequest(ctx, http.MethodGet, "/v3/abuse", params, nil, &result); err != nil {
-		return nil, fmt.Errorf("get abuse contact for %q: %w", ip, err)
+		return nil, fmt.Errorf("get abuse contact for %q: %w", c.redact(ip), err)
 	}
 	return &result, nil
 }
@@ -358,7 +423,7 @@ func (c *Client) GetASNByIP(ctx context.Context, ip string, includes ...string) 
 
 	var result ASNResponse
 	if err := c.doRequest(ctx, http.MethodGet, "/v3/asn", params, nil, &result); err != nil {
-		return nil, fmt.Errorf("get asn for ip %q: %w", ip, err)
+		return nil, fmt.Errorf("get asn for ip %q: %w", c.redact(ip), err)
 	}
 	return &result, nil
 }
@@ -372,7 +437,7 @@ func (c *Client) GetASNByNumber(ctx context.Context, asn string, includes ...str
 
 	var result ASNResponse
 	if err := c.doRequest(ctx, http.MethodGet, "/v3/asn", params, nil, &result); err != nil {
-		return nil, fmt.Errorf("get asn for %q: %w", asn, err)
+		return nil, fmt.Errorf("get asn for %q: %w", c.redact(asn), err)
 	}
 	return &result, nil
 }

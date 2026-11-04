@@ -87,7 +87,8 @@ spec:
 | `hostname_lookup` | string | `fallback_live` | How the hostname is resolved: `database`, `live` or `fallback_live` |
 | `asn_include` | list of strings | `[]` | Optional ASN modules: `peers`, `upstreams`, `downstreams`, `routes`, `whois_response`, or `"*"` for all |
 | `endpoint` | string | `https://api.ipgeolocation.io` | API base URL |
-| `timeout` | string | `30s` | HTTP request timeout |
+| `timeout` | string | `30s` | How long to wait for one API request, such as `30s` or `1m`. Must be greater than zero. |
+| `max_response_mb` | integer | `256` | Largest response to read, in MB. Increase this for large ASN results. Must be a positive whole number. |
 | `retry_attempts` | int | `3` | Retries for transient errors such as 429 and 5xx |
 | `concurrency` | int | `10` | Tables synced in parallel |
 | `rate_limit` | int | `15` | Maximum API requests per second |

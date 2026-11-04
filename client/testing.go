@@ -30,8 +30,9 @@ func TestClient(t *testing.T, handler http.Handler) (*Client, func()) {
 	ipgeo, err := ipgeolocation.NewClient(
 		spec.APIKey,
 		ipgeolocation.WithEndpoint(spec.Endpoint),
-		ipgeolocation.WithTimeout(spec.TimeoutDuration()),
 		ipgeolocation.WithHTTPClient(server.Client()),
+		ipgeolocation.WithTimeout(spec.TimeoutDuration()),
+		ipgeolocation.WithMaxResponseBytes(spec.MaxResponseBytes()),
 		ipgeolocation.WithUserAgent(spec.UserAgent),
 		ipgeolocation.WithRateLimit(spec.RateLimit),
 	)

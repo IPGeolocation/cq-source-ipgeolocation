@@ -2,6 +2,8 @@ package client
 
 import (
 	"encoding/json"
+	"fmt"
+	"math"
 	"testing"
 	"time"
 
@@ -60,6 +62,60 @@ func TestSpecValidateInvalidTimeout(t *testing.T) {
 	err := s.Validate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid timeout")
+}
+
+func TestSpecValidateNonpositiveTimeout(t *testing.T) {
+	for _, timeout := range []string{"0", "0s", "-1ns", "-1m"} {
+		t.Run(timeout, func(t *testing.T) {
+			s := Spec{APIKey: "test-key", Timeout: timeout}
+			s.SetDefaults()
+			require.ErrorContains(t, s.Validate(), "timeout must be greater than zero")
+		})
+	}
+}
+
+func TestSpecResponseSizeConfiguration(t *testing.T) {
+	for _, tc := range []struct {
+		input   string
+		wantMB  int64
+		invalid bool
+	}{
+		{input: `{}`, wantMB: 256},
+		{input: `{"max_response_mb":1}`, wantMB: 1},
+		{input: `{"max_response_mb":512}`, wantMB: 512},
+		{input: `{"max_response_mb":0}`, invalid: true},
+		{input: `{"max_response_mb":-1}`, invalid: true},
+		{input: `{"max_response_mb":1.5}`, invalid: true},
+		{input: `{"max_response_mb":"512"}`, invalid: true},
+		{input: fmt.Sprintf(`{"max_response_mb":%d}`, math.MaxInt64/(1024*1024)+1), invalid: true},
+	} {
+		t.Run(tc.input, func(t *testing.T) {
+			var s Spec
+			err := json.Unmarshal([]byte(tc.input), &s)
+			if err == nil {
+				s.APIKey = "test-key"
+				s.SetDefaults()
+				err = s.Validate()
+			}
+			if tc.invalid {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantMB*1024*1024, s.MaxResponseBytes())
+		})
+	}
+}
+
+func TestSpecPositiveTimeouts(t *testing.T) {
+	for _, timeout := range []string{"1ns", "30s", "1m", "2562047h47m16.854775807s"} {
+		s := Spec{APIKey: "test-key", Timeout: timeout}
+		s.SetDefaults()
+		require.NoError(t, s.Validate())
+		want, err := time.ParseDuration(timeout)
+		require.NoError(t, err)
+		assert.Equal(t, want, s.TimeoutDuration())
+	}
 }
 
 func TestSpecValidateNegativeRetries(t *testing.T) {

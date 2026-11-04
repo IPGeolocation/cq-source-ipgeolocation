@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,6 +21,7 @@ func newTestClient(t *testing.T, handler http.Handler) (*Client, *httptest.Serve
 	c, err := NewClient("test-key",
 		WithEndpoint(server.URL),
 		WithHTTPClient(server.Client()),
+		WithTimeout(5*time.Second),
 		WithRetries(1),
 		WithRateLimit(1000),
 	)
