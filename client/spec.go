@@ -2,6 +2,7 @@ package client
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -30,6 +31,8 @@ type Spec struct {
 	// Timeout is the HTTP client timeout as a duration string (e.g. "30s").
 	// Defaults to "30s".
 	Timeout string `json:"timeout"`
+
+	MaxResponseMB *int64 `json:"max_response_mb,omitempty"`
 
 	// RetryAttempts is the number of times to retry a failed API request.
 	// Defaults to 3.
@@ -100,6 +103,10 @@ func (s *Spec) SetDefaults() {
 	if s.Timeout == "" {
 		s.Timeout = defaultTimeout.String()
 	}
+	if s.MaxResponseMB == nil {
+		limit := ipgeolocation.DefaultMaxResponseBytes / (1024 * 1024)
+		s.MaxResponseMB = &limit
+	}
 	if s.RetryAttempts == 0 {
 		s.RetryAttempts = defaultRetryAttempts
 	}
@@ -119,8 +126,15 @@ func (s *Spec) Validate() error {
 	if s.APIKey == "" {
 		return fmt.Errorf("api_key is required: get one from https://app.ipgeolocation.io/signup")
 	}
-	if _, err := time.ParseDuration(s.Timeout); err != nil {
+	timeout, err := time.ParseDuration(s.Timeout)
+	if err != nil {
 		return fmt.Errorf("invalid timeout %q: %w", s.Timeout, err)
+	}
+	if timeout <= 0 {
+		return fmt.Errorf("timeout must be greater than zero")
+	}
+	if s.MaxResponseMB != nil && (*s.MaxResponseMB <= 0 || *s.MaxResponseMB > math.MaxInt64/(1024*1024)) {
+		return fmt.Errorf("max_response_mb must be a positive whole number no greater than %d", math.MaxInt64/(1024*1024))
 	}
 	if s.RetryAttempts < 0 {
 		return fmt.Errorf("retry_attempts must be >= 0, got %d", s.RetryAttempts)
@@ -236,8 +250,15 @@ func isASNIncludeOption(v string) bool {
 // TimeoutDuration parses and returns the configured timeout.
 func (s *Spec) TimeoutDuration() time.Duration {
 	d, err := time.ParseDuration(s.Timeout)
-	if err != nil {
+	if err != nil || d <= 0 {
 		return defaultTimeout
 	}
 	return d
+}
+
+func (s *Spec) MaxResponseBytes() int64 {
+	if s.MaxResponseMB == nil {
+		return ipgeolocation.DefaultMaxResponseBytes
+	}
+	return *s.MaxResponseMB * 1024 * 1024
 }

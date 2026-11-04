@@ -18,7 +18,8 @@ Everything is set in the `spec` block of a `source` entry in your CloudQuery con
 | `hostname_lookup` | string | `fallback_live` | Hostname resolution mode: `database`, `live` or `fallback_live` |
 | `asn_include` | list of strings | `[]` | Optional ASN modules: `peers`, `upstreams`, `downstreams`, `routes`, `whois_response`, or `"*"` |
 | `endpoint` | string | `https://api.ipgeolocation.io` | API base URL. Change it only for a custom or self hosted endpoint |
-| `timeout` | string | `30s` | HTTP request timeout, written as a Go duration such as `10s` or `1m` |
+| `timeout` | string | `30s` | How long to wait for one API request, such as `30s` or `1m`. Must be greater than zero. |
+| `max_response_mb` | integer | `256` | Largest response to read, in MB. Increase this for large ASN results. Must be a positive whole number. |
 | `retry_attempts` | int | `3` | Retries for transient failures. Must be 0 or higher |
 | `concurrency` | int | `10` | Tables synced in parallel. Must be 1 or higher |
 | `rate_limit` | int | `15` | Maximum API requests per second. Must be 1 or higher |

@@ -52,6 +52,7 @@ func Configure(_ context.Context, logger zerolog.Logger, specBytes []byte, opts 
 		spec.APIKey,
 		ipgeolocation.WithEndpoint(spec.Endpoint),
 		ipgeolocation.WithTimeout(spec.TimeoutDuration()),
+		ipgeolocation.WithMaxResponseBytes(spec.MaxResponseBytes()),
 		ipgeolocation.WithRetries(spec.RetryAttempts),
 		ipgeolocation.WithUserAgent(spec.UserAgent),
 		ipgeolocation.WithRateLimit(spec.RateLimit),
