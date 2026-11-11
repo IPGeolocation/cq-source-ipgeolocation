@@ -25,7 +25,7 @@ If `${IPGEOLOCATION_API_KEY}` reaches the plugin unexpanded, the shell running `
 | 403 | Key is disabled or the request came from a blocked origin | Check the key's status in the dashboard |
 | 404 | No data for the queried resource | Expected for some IPv6 prefixes and unallocated AS numbers |
 | 423 | Bogon address: private, loopback, reserved or multicast | Remove it from `ips`. These ranges have no public location |
-| 429 | Rate limit or daily quota exhausted | Lower `rate_limit`, or check the dashboard for remaining credits |
+| 429 | No credits left: the free plan's daily credits, or a paid plan's credits with overage off or at its cap (the API has no per-second rate limits) | Check remaining credits in the dashboard. Overage is on by default on all paid plans and is switched with Allow Surcharge Usage |
 | 5xx | Server side fault | Retried automatically. Persistent failures are worth reporting |
 
 The plugin retries 429, 500, 502, 503 and 504 along with network failures, backing off 1 second, then 2, then 4. Other 4xx responses are returned at once, because a 400 or a 401 will not improve on a second attempt.
