@@ -22,7 +22,8 @@ If `${IPGEOLOCATION_API_KEY}` reaches the plugin unexpanded, the shell running `
 |---|---|---|
 | 400 | Malformed request, usually an invalid IP or AS number | Check the entry the log names |
 | 401 | Invalid key, or an endpoint your plan does not include | Confirm the key, then check whether the table needs a paid plan |
-| 403 | Key is disabled or the request came from a blocked origin | Check the key's status in the dashboard |
+| 402 | Your paid subscription has expired | Renew the plan in the dashboard |
+| 403 | The key has an IP allow-list and this machine's IP is not on it | Add the IP to the key's allow-list, or remove the list |
 | 404 | No data for the queried resource | Expected for some IPv6 prefixes and unallocated AS numbers |
 | 423 | Bogon address: private, loopback, reserved or multicast | Remove it from `ips`. These ranges have no public location |
 | 429 | No credits left: the free plan's daily credits, or a paid plan's credits with overage off or at its cap (the API has no per-second rate limits) | Check remaining credits in the dashboard. Overage is on by default on all paid plans and is switched with Allow Surcharge Usage |
