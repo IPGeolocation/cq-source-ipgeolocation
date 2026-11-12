@@ -89,7 +89,7 @@ spec:
 | `endpoint` | string | `https://api.ipgeolocation.io` | API base URL |
 | `timeout` | string | `30s` | How long to wait for one API request, such as `30s` or `1m`. Must be greater than zero. |
 | `max_response_mb` | integer | `256` | Largest response to read, in MB. Increase this for large ASN results. Must be a positive whole number. |
-| `retry_attempts` | int | `3` | Retries for transient errors such as 429 and 5xx |
+| `retry_attempts` | int | `3` | Retries for transient errors such as 5xx responses and network failures |
 | `concurrency` | int | `10` | Tables synced in parallel |
 | `rate_limit` | int | `15` | Maximum API requests per second |
 | `user_agent` | string | `cq-source-ipgeolocation/1.0` | User-Agent header sent with every request |

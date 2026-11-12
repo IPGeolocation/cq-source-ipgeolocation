@@ -20,9 +20,10 @@ func (e *APIError) Error() string {
 }
 
 // IsRetryable returns true for transient HTTP errors that are worth retrying.
+// A 429 is not one: it means no credits are left, and a retry cannot add credits.
 func (e *APIError) IsRetryable() bool {
 	switch e.StatusCode {
-	case 429, 500, 502, 503, 504:
+	case 500, 502, 503, 504:
 		return true
 	default:
 		return false

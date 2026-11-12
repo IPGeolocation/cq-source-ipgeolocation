@@ -159,7 +159,7 @@ spec:
 
 The plugin holds a token bucket limiter set to `rate_limit` requests per second with a burst of the same size. The API has no per-second rate limits, so `rate_limit` only paces the sync. A 429 means your credits are used up.
 
-Retries cover 429, 500, 502, 503 and 504 responses along with network level failures. Backoff doubles each time, so the waits are 1 second, then 2, then 4. Other 4xx responses are returned immediately, because retrying a 400 or a 401 will never succeed.
+Retries cover 500, 502, 503 and 504 responses along with network level failures. Backoff doubles each time, so the waits are 1 second, then 2, then 4. 4xx responses, including 429, are returned immediately, because retrying a 400, a 401 or a 429 will never succeed.
 
 `timeout` applies per HTTP request, not to the sync as a whole. Raise it if you enable `hostname_lookup: "live"`, since live reverse DNS is the slowest thing the API does.
 

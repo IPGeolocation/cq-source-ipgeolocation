@@ -189,7 +189,7 @@ func TestAPIErrorRetryable(t *testing.T) {
 		code      int
 		retryable bool
 	}{
-		{429, true},
+		{429, false},
 		{500, true},
 		{502, true},
 		{503, true},
