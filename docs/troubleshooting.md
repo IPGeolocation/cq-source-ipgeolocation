@@ -29,7 +29,7 @@ If `${IPGEOLOCATION_API_KEY}` reaches the plugin unexpanded, the shell running `
 | 429 | No credits left: the free plan's daily credits, or a paid plan's credits with overage off or at its cap (the API has no per-second rate limits) | Check remaining credits in the dashboard. Overage is on by default on all paid plans and is switched with Allow Surcharge Usage |
 | 5xx | Server side fault | Retried automatically. Persistent failures are worth reporting |
 
-The plugin retries 429, 500, 502, 503 and 504 along with network failures, backing off 1 second, then 2, then 4. Other 4xx responses are returned at once, because a 400 or a 401 will not improve on a second attempt.
+The plugin retries 500, 502, 503 and 504 along with network failures, backing off 1 second, then 2, then 4. 4xx responses, including 429, are returned at once, because a 400, a 401 or a 429 will not improve on a second attempt.
 
 ## A Table Is Empty After a Successful Sync
 
