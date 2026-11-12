@@ -157,7 +157,7 @@ spec:
 
 ## Rate Limiting, Retries and Timeouts
 
-The plugin holds a token bucket limiter set to `rate_limit` requests per second with a burst of the same size. Keep it under the ceiling for your plan and you will not see 429s during a large sync.
+The plugin holds a token bucket limiter set to `rate_limit` requests per second with a burst of the same size. The API has no per-second rate limits, so `rate_limit` only paces the sync. A 429 means your credits are used up.
 
 Retries cover 429, 500, 502, 503 and 504 responses along with network level failures. Backoff doubles each time, so the waits are 1 second, then 2, then 4. Other 4xx responses are returned immediately, because retrying a 400 or a 401 will never succeed.
 
